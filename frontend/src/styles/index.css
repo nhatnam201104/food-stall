@@ -1,0 +1,91 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: radial-gradient(circle at top left, #eef3ff 0%, #f5f7fc 45%, #f2f5fb 100%);
+  color: #111827;
+}
+
+.app-shell-sider {
+  border-right: 1px solid #e8ecf7;
+  box-shadow: 0 2px 14px rgba(40, 52, 130, 0.06);
+}
+
+.app-shell-brand {
+  margin: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #2f54eb 0%, #597ef7 100%);
+  color: #fff;
+}
+
+.app-shell-header {
+  border-bottom: 1px solid #edf0f9;
+  box-shadow: 0 2px 8px rgba(20, 34, 87, 0.05);
+}
+
+.app-shell-content {
+  padding: 24px;
+}
+
+.app-shell-footer {
+  border-top: 1px solid #edf0f9;
+}
+
+.auth-background {
+  min-height: 100vh;
+  background: radial-gradient(circle at 20% 10%, #e9efff 0%, #f5f7fc 45%, #f2f5fb 100%);
+}
+
+.auth-panel {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid #e8ecf7;
+  box-shadow: 0 20px 50px rgba(27, 42, 120, 0.12);
+  background: #fff;
+}
+
+.auth-side {
+  padding: 36px;
+  background: linear-gradient(155deg, #1d39c4 0%, #2f54eb 55%, #597ef7 100%);
+  color: #fff;
+}
+
+.auth-form-wrap {
+  padding: 36px;
+  background: #fff;
+}
+
+@media (max-width: 992px) {
+  .auth-panel {
+    grid-template-columns: 1fr !important;
+    max-width: 560px;
+  }
+
+  .auth-side {
+    padding: 24px;
+  }
+
+  .auth-form-wrap {
+    padding: 24px;
+  }
+
+  .app-shell-content {
+    padding: 16px;
+  }
+}
