@@ -32,8 +32,11 @@ body {
 }
 
 .app-shell-header {
+  background: #fff !important;
   border-bottom: 1px solid #edf0f9;
-  box-shadow: 0 2px 8px rgba(20, 34, 87, 0.05);
+  box-shadow: 0 2px 8px rgba(20, 34, 87, 0.06);
+  height: 64px;
+  line-height: 64px;
 }
 
 .app-shell-content {
@@ -52,6 +55,7 @@ body {
 .auth-panel {
   width: 100%;
   max-width: 980px;
+  max-height: min(92vh, 920px);
   margin: 0 auto;
   border-radius: 20px;
   overflow: hidden;
@@ -69,6 +73,7 @@ body {
 .auth-form-wrap {
   padding: 36px;
   background: #fff;
+  overflow-y: auto;
 }
 
 @media (max-width: 992px) {

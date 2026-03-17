@@ -5,7 +5,7 @@ interface StatusBadgeProps {
 }
 
 const getColor = (value: string): string => {
-  if (['active', 'completed'].includes(value)) {
+  if (['active', 'completed', 'approved'].includes(value)) {
     return 'green';
   }
 
@@ -13,7 +13,7 @@ const getColor = (value: string): string => {
     return 'gold';
   }
 
-  if (['suspended', 'inactive', 'banned', 'archived'].includes(value)) {
+  if (['suspended', 'inactive', 'banned', 'archived', 'rejected'].includes(value)) {
     return 'red';
   }
 

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, Form, Input, Space, Typography } from 'antd';
+import { Alert, Button, Divider, Form, Input, Space, Typography } from 'antd';
 import { Controller, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../constants';
@@ -17,20 +17,16 @@ const LoginForm = () => {
 		formState: { errors },
 	} = useForm<LoginPayload>({
 		resolver: zodResolver(loginSchema),
-		defaultValues: {
-			email: '',
-			password: '',
-		},
+		defaultValues: { email: '', password: '' },
 	});
 
 	const onSubmit = async (values: LoginPayload) => {
 		const loggedInUser = await login(values);
-
-		if (!loggedInUser) {
-			return;
-		}
-
-		navigate(loggedInUser.role === 'admin' ? ROUTES.admin.dashboard : ROUTES.merchant.dashboard, { replace: true });
+		if (!loggedInUser) return;
+		navigate(
+			loggedInUser.role === 'admin' ? ROUTES.admin.dashboard : ROUTES.merchant.dashboard,
+			{ replace: true },
+		);
 	};
 
 	return (
@@ -40,7 +36,7 @@ const LoginForm = () => {
 					Welcome back
 				</Typography.Title>
 				<Typography.Text type="secondary">
-					Sign in with your account. The system automatically opens the correct dashboard by role.
+					Sign in to your account to continue.
 				</Typography.Text>
 			</div>
 
@@ -51,10 +47,13 @@ const LoginForm = () => {
 					<Controller
 						control={control}
 						name="email"
-						render={({ field }) => <Input {...field} placeholder="you@example.com" onChange={(event) => {
-							clearError();
-							field.onChange(event);
-						}} />}
+						render={({ field }) => (
+							<Input
+								{...field}
+								placeholder="you@example.com"
+								onChange={(e) => { clearError(); field.onChange(e); }}
+							/>
+						)}
 					/>
 				</Form.Item>
 
@@ -62,25 +61,30 @@ const LoginForm = () => {
 					<Controller
 						control={control}
 						name="password"
-						render={({ field }) => <Input.Password {...field} placeholder="Enter password" onChange={(event) => {
-							clearError();
-							field.onChange(event);
-						}} />}
+						render={({ field }) => (
+							<Input.Password
+								{...field}
+								placeholder="Enter your password"
+								onChange={(e) => { clearError(); field.onChange(e); }}
+							/>
+						)}
 					/>
 				</Form.Item>
+
+				<div style={{ textAlign: 'right', marginBottom: 16 }}>
+					<Link to={ROUTES.auth.forgotPassword}>Forgot password?</Link>
+				</div>
 
 				<Button htmlType="submit" type="primary" block loading={isLoading}>
 					Sign in
 				</Button>
 			</Form>
 
-			<Space direction="vertical" size={4} style={{ width: '100%' }}>
-				<Typography.Text type="secondary">Admin demo: admin@audiotour.local / admin123</Typography.Text>
-				<Typography.Text type="secondary">Merchant demo: merchant@audiotour.local / merchant123</Typography.Text>
-				<Typography.Text>
-					New merchant? <Link to={ROUTES.auth.merchantRegister}>Create merchant account</Link>
-				</Typography.Text>
-			</Space>
+			<Divider />
+			<Typography.Text style={{ display: 'block', textAlign: 'center' }}>
+				New merchant?{' '}
+				<Link to={ROUTES.auth.merchantRegister}>Create merchant account</Link>
+			</Typography.Text>
 		</Space>
 	);
 };

@@ -1,0 +1,39 @@
+// ─── Tour & TourPoi models ────────────────────────────────────────────────────
+
+model Tour {
+  id            String   @id @default(uuid())
+  createdBy     String   @map("created_by")
+  name          String   @db.VarChar(200)
+  description   String?  @db.Text
+  coverImageUrl String?  @map("cover_image_url") @db.VarChar(500)
+  status        String   @default("active") @db.VarChar(20)
+  estimatedDurationMinutes Int? @map("estimated_duration_minutes")
+  isDeleted     Boolean  @default(false) @map("is_deleted")
+  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  creator      User          @relation(fields: [createdBy], references: [id])
+  tourPois     TourPoi[]
+  userSessions UserSession[]
+
+  @@index([createdBy, status, isDeleted], map: "idx_tour_creator_status_deleted")
+  @@index([isDeleted, createdAt], map: "idx_tour_deleted_created_at")
+  @@map("tours")
+}
+
+model TourPoi {
+  id            String  @id @default(uuid())
+  tourId        String  @map("tour_id")
+  poiId         String  @map("poi_id")
+  sequenceOrder Int     @map("sequence_order")
+  isMandatory   Boolean @default(false) @map("is_mandatory")
+
+  tour Tour           @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  poi  PointOfInterest @relation(fields: [poiId], references: [id], onDelete: Cascade)
+
+  @@unique([tourId, poiId])
+  @@unique([tourId, sequenceOrder])
+  @@index([poiId], map: "idx_tour_poi_poi_id")
+  @@map("tour_poi")
+}

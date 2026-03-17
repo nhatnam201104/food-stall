@@ -1,16 +1,26 @@
 export const ROUTES = {
   root: '/',
+  public: {
+    home: '/',
+    pricing: '/pricing',
+    contact: '/contact',
+  },
   auth: {
     adminLogin: '/auth/admin/login',
     merchantLogin: '/auth/merchant/login',
     merchantRegister: '/auth/merchant/register',
+    forgotPassword: '/auth/forgot-password',
+    resetPassword: '/auth/reset-password',
   },
   admin: {
     root: '/admin',
     dashboard: '/admin/dashboard',
     users: '/admin/users',
     pois: '/admin/pois',
+    poisMap: '/admin/pois/map',
     tours: '/admin/tours',
+    toursCreate: '/admin/tours/create',
+    toursEdit: '/admin/tours/:id/edit',
     analytics: '/admin/analytics',
   },
   merchant: {
@@ -19,6 +29,7 @@ export const ROUTES = {
     profile: '/merchant/profile',
     pois: '/merchant/pois',
     poisCreate: '/merchant/pois/create',
+    poisMap: '/merchant/pois/map',
     history: '/merchant/history',
     analytics: '/merchant/analytics',
   },

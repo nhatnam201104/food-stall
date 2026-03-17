@@ -7,7 +7,12 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ redirectTo }: ProtectedRouteProps) => {
+  const isHydrated = useAuthStore((state) => state.isHydrated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  if (!isHydrated) {
+    return null;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to={redirectTo} replace />;

@@ -1,6 +1,5 @@
 import { Card, Col, List, Row, Table } from 'antd';
 import { PageContainer } from '../../shared';
-import { mockTopPois } from '../../../mock';
 
 const AdminAnalytics = () => (
   <PageContainer title="Analytics" subtitle="System analytics with placeholders for heatmap and route tracking">
@@ -8,8 +7,9 @@ const AdminAnalytics = () => (
       <Col xs={24} lg={12}>
         <Card title="Top POIs">
           <List
-            dataSource={mockTopPois}
-            renderItem={(item) => (
+            dataSource={[]}
+            locale={{ emptyText: 'No data yet' }}
+            renderItem={(item: { poiName: string; totalPlays: number; averageListeningSeconds: number }) => (
               <List.Item>
                 {item.poiName} - {item.totalPlays} plays - Avg {item.averageListeningSeconds}s
               </List.Item>
@@ -23,22 +23,22 @@ const AdminAnalytics = () => (
             rowKey="metric"
             pagination={false}
             dataSource={[
-              { metric: 'Total Sessions', value: 1420 },
-              { metric: 'Avg Session Duration', value: '18m' },
-              { metric: 'Completion Rate', value: '71%' },
+              { metric: 'Total Sessions', value: '—' },
+              { metric: 'Avg Session Duration', value: '—' },
+              { metric: 'Completion Rate', value: '—' },
             ]}
             columns={[{ title: 'Metric', dataIndex: 'metric' }, { title: 'Value', dataIndex: 'value' }]}
           />
         </Card>
       </Col>
       <Col span={24}>
-        <Card title="Heatmap Placeholder" style={{ minHeight: 180 }}>
-          Heatmap placeholder area (MOCK)
+        <Card title="Heatmap" style={{ minHeight: 180, display: 'grid', placeItems: 'center', color: '#999' }}>
+          Heatmap coming soon
         </Card>
       </Col>
       <Col span={24}>
-        <Card title="Route Tracking Placeholder" style={{ minHeight: 180 }}>
-          Route tracking placeholder area (MOCK)
+        <Card title="Route Tracking" style={{ minHeight: 180, display: 'grid', placeItems: 'center', color: '#999' }}>
+          Route tracking coming soon
         </Card>
       </Col>
     </Row>

@@ -6,6 +6,7 @@ import MerchantDashboardPage from '../pages/merchant/dashboard.page';
 import MerchantHistoryPage from '../pages/merchant/history.page';
 import MerchantPoisPage from '../pages/merchant/pois.page';
 import MerchantPoisCreatePage from '../pages/merchant/pois-create.page';
+import MerchantPoisMapPage from '../pages/merchant/pois-map.page';
 import MerchantProfilePage from '../pages/merchant/profile.page';
 import { MerchantProtectedRoute } from './guards/protected-route.guard';
 import { RoleGuard } from './guards/role.guard';
@@ -19,6 +20,7 @@ const merchantRoutes = (
 				<Route path="profile" element={<MerchantProfilePage />} />
 				<Route path="pois" element={<MerchantPoisPage />} />
 				<Route path="pois/create" element={<MerchantPoisCreatePage />} />
+				<Route path="pois/map" element={<MerchantPoisMapPage />} />
 				<Route path="history" element={<MerchantHistoryPage />} />
 				<Route path="analytics" element={<MerchantAnalyticsPage />} />
 			</Route>

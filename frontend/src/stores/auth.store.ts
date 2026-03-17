@@ -1,84 +1,103 @@
 import { create } from 'zustand';
-import { mockAuthService } from '../mock/auth.mock.service';
-import type { AuthSessionUser, LoginPayload, MerchantRegisterPayload } from '../types';
+import { authService } from '../services/auth.service';
+import type { AuthSessionUser, LoginPayload, MerchantRegisterPayload, UpdateProfilePayload } from '../types/auth.types';
 import { clearAuthSession, getAuthSession, saveAuthSession } from '../utils/auth.utils';
 
 interface AuthStore {
   user: AuthSessionUser | null;
   token: string | null;
   isAuthenticated: boolean;
+  isHydrated: boolean;
   isLoading: boolean;
   error: string | null;
   hydrateFromStorage: () => void;
   login: (payload: LoginPayload) => Promise<AuthSessionUser | null>;
   registerMerchant: (payload: MerchantRegisterPayload) => Promise<boolean>;
   logout: () => void;
+  updateProfile: (payload: UpdateProfilePayload) => Promise<boolean>;
   clearError: () => void;
 }
 
 const setSession = (user: AuthSessionUser, token: string): void => {
   saveAuthSession({ user, token });
+  localStorage.setItem('auth_token', token);
+  localStorage.setItem('auth_user', JSON.stringify(user));
 };
 
-export const useAuthStore = create<AuthStore>((set) => ({
+const clearSession = (): void => {
+  clearAuthSession();
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_user');
+};
+
+export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
+  isHydrated: false,
   isLoading: false,
   error: null,
 
   hydrateFromStorage: () => {
     const session = getAuthSession();
-
     if (!session) {
+      set({ isHydrated: true });
       return;
     }
-
-    set({
-      user: session.user,
-      token: session.token,
-      isAuthenticated: true,
-    });
+    set({ user: session.user, token: session.token, isAuthenticated: true, isHydrated: true });
   },
 
   login: async (payload) => {
     set({ isLoading: true, error: null });
-    const result = await mockAuthService.login(payload);
-
-    if (!result.success || !result.user || !result.token) {
-      set({ isLoading: false, error: result.message });
+    try {
+      const res = await authService.login(payload);
+      const { token, user } = res.data.data!;
+      setSession(user, token);
+      set({ user, token, isAuthenticated: true, isLoading: false, error: null });
+      return user;
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const message = axiosErr.response?.data?.message || 'Login failed. Please try again.';
+      set({ isLoading: false, error: message });
       return null;
     }
-
-    setSession(result.user, result.token);
-    set({ user: result.user, token: result.token, isAuthenticated: true, isLoading: false, error: null });
-    return result.user;
   },
 
   registerMerchant: async (payload) => {
     set({ isLoading: true, error: null });
-    const servicePayload = {
-      fullName: payload.fullName,
-      email: payload.email,
-      password: payload.password,
-      phone: payload.phone,
-      shopName: payload.shopName,
-      address: payload.address,
-    };
-    const result = await mockAuthService.registerMerchant(servicePayload);
-
-    if (!result.success) {
-      set({ isLoading: false, error: result.message });
+    try {
+      await authService.register(payload);
+      set({ isLoading: false, error: null });
+      return true;
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const message = axiosErr.response?.data?.message || 'Registration failed. Please try again.';
+      set({ isLoading: false, error: message });
       return false;
     }
-
-    set({ isLoading: false, error: null });
-    return true;
   },
 
-  logout: () => {
-    clearAuthSession();
+  logout: async () => {
+    try { await authService.logout(); } catch { /* silent */ }
+    clearSession();
     set({ user: null, token: null, isAuthenticated: false, isLoading: false, error: null });
+  },
+
+  updateProfile: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authService.updateProfile(payload);
+      const updatedUser = res.data.data!;
+      const token = get().token!;
+      setSession(updatedUser, token);
+      set({ user: updatedUser, isLoading: false });
+      return true;
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const message = axiosErr.response?.data?.message || 'Update failed. Please try again.';
+      set({ isLoading: false, error: message });
+      return false;
+    }
   },
 
   clearError: () => set({ error: null }),

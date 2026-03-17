@@ -8,7 +8,12 @@ interface RoleGuardProps {
 }
 
 export const RoleGuard = ({ role }: RoleGuardProps) => {
+  const isHydrated = useAuthStore((state) => state.isHydrated);
   const user = useAuthStore((state) => state.user);
+
+  if (!isHydrated) {
+    return null;
+  }
 
   if (!user) {
     return <Navigate to={ROUTES.root} replace />;

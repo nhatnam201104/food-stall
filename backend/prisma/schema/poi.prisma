@@ -1,0 +1,52 @@
+// ─── POI & Audio models ───────────────────────────────────────────────────────
+
+model PointOfInterest {
+  id              String   @id @default(uuid())
+  merchantId      String   @map("merchant_id")
+  name            String   @db.VarChar(200)
+  description     String?  @db.Text
+  address         String?  @db.Text
+  imageUrl        String?  @map("image_url") @db.VarChar(500)
+  latitude        Decimal  @db.Decimal(10, 7)
+  longitude       Decimal  @db.Decimal(10, 7)
+  radiusMeters    Int      @default(15) @map("radius_meters")
+  priority        Int      @default(1)
+  isActive        Boolean  @default(true) @map("is_active")
+  approvalStatus  String   @default("pending") @map("approval_status") @db.VarChar(20)
+  reviewNote      String?  @map("review_note") @db.Text
+  reviewedBy      String?  @map("reviewed_by")
+  reviewedAt      DateTime? @map("reviewed_at")
+  audioMode       String   @default("tts") @map("audio_mode") @db.VarChar(20)
+  cooldownSeconds Int      @default(30) @map("cooldown_seconds")
+  submittedAt     DateTime @default(now()) @map("submitted_at")
+  isDeleted       Boolean  @default(false) @map("is_deleted")
+  deletedAt       DateTime? @map("deleted_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  merchant         Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  reviewer         User?              @relation("PoiReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  poiAudio         PoiAudio[]
+  tourPoi          TourPoi[]
+  audioPlayHistory AudioPlayHistory[]
+
+  @@index([merchantId, approvalStatus, isActive, isDeleted], map: "idx_poi_merchant_status_active_deleted")
+  @@index([approvalStatus, isActive, isDeleted], map: "idx_poi_status_active_deleted")
+  @@index([isDeleted, createdAt], map: "idx_poi_deleted_created_at")
+  @@map("points_of_interest")
+}
+
+model PoiAudio {
+  id            String   @id @default(uuid())
+  poiId         String   @map("poi_id")
+  languageCode  String   @default("vi") @map("language_code") @db.VarChar(10)
+  ttsContent    String?  @map("tts_content") @db.Text
+  audioUrl      String?  @map("audio_url") @db.VarChar(500)
+  fileSizeBytes BigInt?  @map("file_size_bytes")
+  status        String   @default("active") @db.VarChar(20)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  poi PointOfInterest @relation(fields: [poiId], references: [id], onDelete: Cascade)
+
+  @@map("poi_audio")
+}

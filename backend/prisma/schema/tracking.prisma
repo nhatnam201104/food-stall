@@ -1,0 +1,53 @@
+// ─── GPS Tracking & Session models ───────────────────────────────────────────
+
+model UserSession {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  tourId      String?   @map("tour_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+  deviceInfo  String?   @map("device_info") @db.VarChar(200)
+  offlineMode Boolean   @default(false) @map("offline_mode")
+  appVersion  String?   @map("app_version") @db.VarChar(20)
+
+  user             User               @relation(fields: [userId], references: [id])
+  tour             Tour?              @relation(fields: [tourId], references: [id])
+  gpsTracks        GpsTrack[]
+  audioPlayHistory AudioPlayHistory[]
+
+  @@map("user_sessions")
+}
+
+model GpsTrack {
+  id             String   @id @default(uuid())
+  sessionId      String   @map("session_id")
+  latitude       Decimal  @db.Decimal(10, 7)
+  longitude      Decimal  @db.Decimal(10, 7)
+  accuracyMeters Decimal? @map("accuracy_meters") @db.Decimal(6, 2)
+  speedMps       Decimal? @map("speed_mps") @db.Decimal(6, 3)
+  recordedAt     DateTime @default(now()) @map("recorded_at")
+
+  session UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, recordedAt])
+  @@map("gps_tracks")
+}
+
+model AudioPlayHistory {
+  id                   String   @id @default(uuid())
+  sessionId            String   @map("session_id")
+  poiId                String   @map("poi_id")
+  triggeredAt          DateTime @default(now()) @map("triggered_at")
+  triggerType          String   @map("trigger_type") @db.VarChar(20)
+  playDurationSeconds  Int?     @map("play_duration_seconds")
+  totalDurationSeconds Int?     @map("total_duration_seconds")
+  completed            Boolean  @default(false)
+  stopReason           String?  @map("stop_reason") @db.VarChar(30)
+
+  session UserSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  poi     PointOfInterest @relation(fields: [poiId], references: [id])
+
+  @@index([sessionId, poiId, triggeredAt])
+  @@index([poiId])
+  @@map("audio_play_history")
+}

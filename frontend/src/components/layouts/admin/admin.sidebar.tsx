@@ -24,21 +24,39 @@ const getIcon = (key: string) => {
 	return <DashboardOutlined />;
 };
 
-const findSelectedKey = (items: SidebarMenuItem[], pathname: string): string | undefined => {
-	for (const item of items) {
-		if (item.path && pathname.startsWith(item.path)) {
-			return item.key;
-		}
+const normalizePath = (path: string) => path.replace(/\/+$/, '') || '/';
 
-		if (item.children) {
-			const matched = findSelectedKey(item.children, pathname);
-			if (matched) {
-				return matched;
+const isPathMatch = (menuPath: string, pathname: string): boolean => {
+	const normalizedMenuPath = normalizePath(menuPath);
+	const normalizedPathname = normalizePath(pathname);
+
+	return normalizedPathname === normalizedMenuPath
+		|| normalizedPathname.startsWith(`${normalizedMenuPath}/`);
+};
+
+const findSelectedKey = (items: SidebarMenuItem[], pathname: string): string | undefined => {
+	let bestKey: string | undefined;
+	let bestPathLength = -1;
+
+	const walk = (menuItems: SidebarMenuItem[]) => {
+		for (const item of menuItems) {
+			if (item.path && isPathMatch(item.path, pathname)) {
+				const currentLength = normalizePath(item.path).length;
+				if (currentLength > bestPathLength) {
+					bestPathLength = currentLength;
+					bestKey = item.key;
+				}
+			}
+
+			if (item.children) {
+				walk(item.children);
 			}
 		}
-	}
+	};
 
-	return undefined;
+	walk(items);
+
+	return bestKey;
 };
 
 const mapMenuItems = (

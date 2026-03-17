@@ -1,64 +1,83 @@
-import { Button, Card, Col, Form, Input, List, Row, Select, Space, Typography } from 'antd';
-import { useMemo, useState } from 'react';
-import { mockPois, mockTourPois, mockTours } from '../../../mock';
+import { Button, Input, Modal, Select, Space, Table, Tag } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { ROUTES } from '../../../constants';
+import { adminTourService } from '../../../services/admin/tour.service';
 import type { Tour } from '../../../types';
-import { PageContainer, TableShell } from '../../shared';
-import TourFilter from './tour.filter';
-import TourTable from './tour.table';
+import { CustomPagination, PageContainer, TableShell } from '../../shared';
 
 const TourManagement = () => {
-	const [query, setQuery] = useState('');
+	const navigate = useNavigate();
+	const [loading, setLoading] = useState(false);
+	const [data, setData] = useState<Tour[]>([]);
+	const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
+	const [search, setSearch] = useState('');
 	const [status, setStatus] = useState<'all' | 'active' | 'draft' | 'archived'>('all');
-	const [selectedTour, setSelectedTour] = useState<Tour | null>(mockTours[0]);
 
-	const filteredTours = useMemo(() => mockTours.filter((item) => {
-		const queryMatched = item.name.toLowerCase().includes(query.toLowerCase());
-		const statusMatched = status === 'all' || item.status === status;
-		return queryMatched && statusMatched;
-	}), [query, status]);
+	const fetchTours = async () => {
+		setLoading(true);
+		try {
+			const res = await adminTourService.list({
+				page: pagination.page,
+				limit: pagination.limit,
+				search: search || undefined,
+				status: status === 'all' ? undefined : status,
+				sortBy: 'createdAt',
+				sortOrder: 'desc',
+			});
+			setData(res.data.data || []);
+			if (res.data.pagination) setPagination(res.data.pagination);
+		} catch {
+			toast.error('Failed to load tours');
+		} finally {
+			setLoading(false);
+		}
+	};
 
-	const sequence = useMemo(
-		() => mockTourPois
-			.filter((item) => item.tourId === selectedTour?.id)
-			.sort((a, b) => a.sequenceOrder - b.sequenceOrder)
-			.map((item) => ({ ...item, poi: mockPois.find((poi) => poi.id === item.poiId) })),
-		[selectedTour],
-	);
+	useEffect(() => {
+		fetchTours();
+	}, [pagination.page, pagination.limit, search, status]);
+
+
+	const onDeleteTour = (tour: Tour) => {
+		Modal.confirm({
+			title: 'Delete this tour?',
+			content: 'This will archive and soft-delete the tour.',
+			onOk: async () => {
+				await adminTourService.remove(tour.id);
+				toast.success('Tour deleted');
+				fetchTours();
+			},
+		});
+	};
+
+	const columns: ColumnsType<Tour> = useMemo(() => [
+		{ title: 'Tour Name', dataIndex: 'name', render: (name: string) => <strong>{name}</strong> },
+		{ title: 'Status', dataIndex: 'status', render: (v: string) => <Tag color={v === 'active' ? 'green' : v === 'draft' ? 'gold' : 'red'}>{v}</Tag> },
+		{ title: 'POIs', dataIndex: ['_count', 'tourPois'], align: 'center' },
+		{ title: 'Duration', dataIndex: 'estimatedDurationMinutes', render: (v: number | null) => v ? `${v} min` : '-' },
+		{ title: 'Actions', key: 'actions', render: (_, row) => (
+			<Space>
+				<Button size="small" onClick={() => navigate(ROUTES.admin.toursEdit.replace(':id', row.id))}>Edit</Button>
+				<Button size="small" danger onClick={() => onDeleteTour(row)}>Delete</Button>
+			</Space>
+		) },
+	], [navigate]);
 
 	return (
-		<PageContainer title="Tour Management" subtitle="Manage route sequence and POI mapping">
-			<TourFilter status={status} onStatusChange={setStatus} onSearchChange={setQuery} />
-			<Row gutter={[16, 16]}>
-				<Col xs={24} xl={14}>
-					<TableShell title="Tours List">
-						<TourTable data={filteredTours} onSelect={setSelectedTour} />
-					</TableShell>
-				</Col>
-				<Col xs={24} xl={10}>
-					<Card title="Tour Editor (Mock)">
-						<Form layout="vertical" initialValues={selectedTour ?? undefined} key={selectedTour?.id}>
-							<Form.Item label="Name" name="name"><Input /></Form.Item>
-							<Form.Item label="Description" name="description"><Input.TextArea rows={3} /></Form.Item>
-							<Form.Item label="Status" name="status">
-								<Select options={[{ value: 'active', label: 'Active' }, { value: 'draft', label: 'Draft' }, { value: 'archived', label: 'Archived' }]} />
-							</Form.Item>
-							<Form.Item label="Duration (minutes)" name="estimatedDurationMinutes"><Input /></Form.Item>
-							<Space>
-								<Button type="primary">Save (Mock)</Button>
-								<Button>Add POI (Mock)</Button>
-							</Space>
-						</Form>
-						<Typography.Title level={5} style={{ marginTop: 20 }}>Route Sequence</Typography.Title>
-						<List
-							bordered
-							dataSource={sequence}
-							renderItem={(item) => (
-								<List.Item actions={[<a key="remove">Remove</a>]}>#{item.sequenceOrder} - {item.poi?.name ?? 'Unknown POI'}</List.Item>
-							)}
-						/>
-					</Card>
-				</Col>
-			</Row>
+		<PageContainer title="Tour Management" subtitle="Manage tours and navigate to dedicated create/edit screens">
+			<Space wrap style={{ marginBottom: 16 }}>
+				<Input.Search allowClear placeholder="Search tours" style={{ width: 260 }} onSearch={(value) => { setSearch(value); setPagination((prev) => ({ ...prev, page: 1 })); }} />
+				<Select value={status} style={{ width: 160 }} onChange={(value) => { setStatus(value); setPagination((prev) => ({ ...prev, page: 1 })); }} options={[{ value: 'all', label: 'All' }, { value: 'active', label: 'Active' }, { value: 'draft', label: 'Draft' }, { value: 'archived', label: 'Archived' }]} />
+				<Button type="primary" onClick={() => navigate(ROUTES.admin.toursCreate)}>+ New Tour</Button>
+			</Space>
+
+			<TableShell title={`Tours (${pagination.total})`}>
+				<Table rowKey="id" dataSource={data} columns={columns} loading={loading} pagination={false} scroll={{ x: 920 }} />
+				<CustomPagination current={pagination.page} pageSize={pagination.limit} total={pagination.total} onChange={(page, pageSize) => setPagination((prev) => ({ ...prev, page, limit: pageSize }))} />
+			</TableShell>
 		</PageContainer>
 	);
 };

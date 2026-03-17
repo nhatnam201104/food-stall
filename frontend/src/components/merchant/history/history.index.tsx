@@ -1,14 +1,13 @@
 import { DatePicker, Select, Space, Table } from 'antd';
-import { mockInteractionHistory, mockPois } from '../../../mock';
 import { PageContainer, TableShell } from '../../shared';
 
 const MerchantHistory = () => (
   <PageContainer title="Interaction History" subtitle="Track interactions and listening duration">
-    <Space wrap>
+    <Space wrap style={{ marginBottom: 16 }}>
       <Select
         placeholder="Filter by POI"
         style={{ width: 220 }}
-        options={mockPois.map((poi) => ({ value: poi.id, label: poi.name }))}
+        options={[]}
         allowClear
       />
       <DatePicker.RangePicker />
@@ -17,7 +16,8 @@ const MerchantHistory = () => (
     <TableShell title="Interactions">
       <Table
         rowKey="id"
-        dataSource={mockInteractionHistory}
+        dataSource={[]}
+        locale={{ emptyText: 'No interaction history yet' }}
         columns={[
           { title: 'Timestamp', dataIndex: 'triggeredAt' },
           { title: 'POI', dataIndex: 'poiId' },

@@ -1,0 +1,11 @@
+// ─── Entry point: datasource + generator ──────────────────────────────────────
+// All models are defined in sibling .prisma files in this directory.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
