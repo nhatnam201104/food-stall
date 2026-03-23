@@ -14,6 +14,7 @@ const requireEnv = (key: string): string => {
 export const config = {
   env: (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test',
   port: parseInt(process.env.PORT || '3000', 10),
+  host: process.env.HOST || '0.0.0.0',
 
   database: {
     url: requireEnv('DATABASE_URL'),

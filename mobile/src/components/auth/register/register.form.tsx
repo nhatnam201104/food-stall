@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,19 +12,59 @@ import {
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { authStyles, COLORS } from '../../../styles/auth.styles';
+import { registerSchema } from '../../../libs/validation/auth/register.schema';
+import { useAuthStore } from '../../../stores/auth.store';
+import type { AuthStore } from '../../../stores/auth.store';
 
 const RegisterScreen = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
-  const handleRegister = () => {
-    // Just a design demo
-    console.log('Register pressed');
+  const registerTourist = useAuthStore((state: AuthStore) => state.registerTourist);
+  const isLoading = useAuthStore((state: AuthStore) => state.isLoading);
+
+  const handleRegister = async () => {
+    const parsed = registerSchema.safeParse({
+      fullName: name,
+      email,
+      phone,
+      password,
+      confirmPassword,
+    });
+
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message || 'Invalid form data.';
+      setFieldError(firstError);
+      return;
+    }
+
+    setFieldError(null);
+    const success = await registerTourist({
+      fullName: parsed.data.fullName,
+      email: parsed.data.email,
+      phone: parsed.data.phone,
+      password: parsed.data.password,
+      confirmPassword: parsed.data.confirmPassword,
+    });
+
+    if (success) {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    const latestError = useAuthStore.getState().error;
+    if (latestError) {
+      setFieldError(latestError);
+      Alert.alert('Registration error', latestError);
+    }
   };
 
   const navigateToLogin = () => {
@@ -88,6 +128,23 @@ const RegisterScreen = () => {
 
             <View style={authStyles.inputContainer}>
               <Ionicons
+                name="call-outline"
+                size={20}
+                color={COLORS.textLight}
+                style={authStyles.icon}
+              />
+              <TextInput
+                style={authStyles.input}
+                placeholder="Phone Number (optional)"
+                placeholderTextColor={COLORS.textLight}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={authStyles.inputContainer}>
+              <Ionicons
                 name="lock-closed-outline"
                 size={20}
                 color={COLORS.textLight}
@@ -134,9 +191,11 @@ const RegisterScreen = () => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={authStyles.button} onPress={handleRegister}>
-              <Text style={authStyles.buttonText}>REGISTER</Text>
+            <TouchableOpacity style={authStyles.button} onPress={handleRegister} disabled={isLoading}>
+              <Text style={authStyles.buttonText}>{isLoading ? 'LOADING...' : 'REGISTER'}</Text>
             </TouchableOpacity>
+
+            {!!fieldError && <Text style={{ color: COLORS.error }}>{fieldError}</Text>}
           </View>
 
           <View style={authStyles.footerContainer}>

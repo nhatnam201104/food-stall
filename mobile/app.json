@@ -14,7 +14,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần quyền vị trí để theo dõi vị trí realtime và kích hoạt audio theo điểm bạn đang đứng."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,14 +25,24 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Ứng dụng cần quyền vị trí để cập nhật di chuyển realtime và tự kích hoạt audio theo điểm đứng của bạn."
+        }
+      ]
     ]
   }
 }

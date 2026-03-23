@@ -34,6 +34,6 @@ export const authorize = (...roles: string[]) =>
       sendError(res, 'You do not have permission to perform this action', StatusCodes.FORBIDDEN);
       return;
     }
-
+     
     next();
   };

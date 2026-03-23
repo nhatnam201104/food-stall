@@ -5,6 +5,7 @@ import { handleValidationErrors } from '../middleware/validate.middleware';
 import { authLimiter } from '../middleware/rate-limit.middleware';
 import {
   registerValidation,
+  touristRegisterValidation,
   loginValidation,
   updateProfileValidation,
   changePasswordValidation,
@@ -17,6 +18,8 @@ const router = Router();
 // Public routes
 router.post('/register', authLimiter, registerValidation, handleValidationErrors, authController.register);
 router.post('/login', authLimiter, loginValidation, handleValidationErrors, authController.login);
+router.post('/tourist/register', authLimiter, touristRegisterValidation, handleValidationErrors, authController.registerTourist);
+router.post('/tourist/login', authLimiter, loginValidation, handleValidationErrors, authController.loginTourist);
 router.post('/forgot-password', authLimiter, forgotPasswordValidation, handleValidationErrors, authController.forgotPassword);
 router.post('/reset-password', resetPasswordValidation, handleValidationErrors, authController.resetPassword);
 

@@ -10,10 +10,11 @@ const startServer = async () => {
 
     const app = createApp();
 
-    const server = app.listen(config.port, () => {
+    const server = app.listen(config.port, config.host, () => {
       console.log('\n========================================');
       console.log(`🚀  Server is running!`);
       console.log(`📦  Environment : ${config.env}`);
+      console.log(`🧭  Host        : ${config.host}`);
       console.log(`🌐  Port        : ${config.port}`);
       console.log(`🔗  API Base    : http://localhost:${config.port}/api/v1`);
       console.log(`❤️  Health      : http://localhost:${config.port}/health`);

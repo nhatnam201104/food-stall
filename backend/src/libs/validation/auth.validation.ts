@@ -57,6 +57,53 @@ export const registerValidation = [
     }),
 ];
 
+export const touristRegisterValidation = [
+  body('fullName')
+    .trim()
+    .notEmpty().withMessage('Full name is required')
+    .isLength({ max: 150 }).withMessage('Full name must not exceed 150 characters'),
+
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Invalid email format')
+    .normalizeEmail(),
+
+  body('password')
+    .notEmpty().withMessage('Password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+
+  body('confirmPassword')
+    .notEmpty().withMessage('Confirm password is required')
+    .custom((value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error('Passwords do not match');
+      }
+      return true;
+    }),
+
+  body('phone')
+    .optional({ nullable: true, checkFalsy: true })
+    .customSanitizer((value) => normalizeVietnamPhone(value) ?? value)
+    .custom((value) => {
+      if (value === undefined || value === null || value === '') return true;
+      if (!isNormalizedVietnamPhone(value)) {
+        throw new Error('Phone number must be a valid Vietnam number (auto format +84)');
+      }
+      return true;
+    }),
+
+  body('avatarUrl')
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((val) => {
+      if (!val) return true;
+      const isFullUrl = /^https?:\/\/.+/.test(val);
+      const isRelativePath = val.startsWith('/');
+      if (!isFullUrl && !isRelativePath) throw new Error('Avatar URL must be a valid URL or path');
+      return true;
+    }),
+];
+
 export const loginValidation = [
   body('email')
     .trim()

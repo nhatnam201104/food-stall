@@ -97,6 +97,49 @@ export const authService = {
     };
   },
 
+  async registerTourist(data: {
+    fullName: string;
+    email: string;
+    password: string;
+    phone?: string;
+    avatarUrl?: string;
+  }) {
+    const normalizedPhone = normalizeOptionalVietnamPhone(data.phone);
+
+    const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existingUser) {
+      throw AppError.conflict('Email already in use', 'EMAIL_EXISTS');
+    }
+
+    const touristRole = await prisma.role.findUnique({ where: { name: 'tourist' } });
+    if (!touristRole) throw new AppError('Role configuration error', 500, 'CONFIG_ERROR');
+
+    const passwordHash = await hashPassword(data.password);
+
+    await prisma.user.create({
+      data: {
+        roleId: touristRole.id,
+        fullName: data.fullName,
+        email: data.email,
+        passwordHash,
+        phone: normalizedPhone,
+        avatarUrl: data.avatarUrl || null,
+      },
+    });
+
+    return { message: 'Tourist account registered successfully. Please login.' };
+  },
+
+  async loginTourist(email: string, password: string) {
+    const result = await this.login(email, password);
+
+    if (result.user.role !== 'tourist') {
+      throw AppError.forbidden('This login is only available for tourist accounts', 'ROLE_NOT_ALLOWED');
+    }
+
+    return result;
+  },
+
   async getMe(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },

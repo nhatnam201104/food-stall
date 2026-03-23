@@ -20,6 +20,22 @@ export const authController = {
     } catch (err) { next(err); }
   },
 
+  async registerTourist(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { fullName, email, password, phone, avatarUrl } = req.body;
+      const result = await authService.registerTourist({ fullName, email, password, phone, avatarUrl });
+      sendCreated(res, null, result.message);
+    } catch (err) { next(err); }
+  },
+
+  async loginTourist(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, password } = req.body;
+      const result = await authService.loginTourist(email, password);
+      sendSuccess(res, result, 'Login successful');
+    } catch (err) { next(err); }
+  },
+
   async logout(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       sendSuccess(res, null, 'Logged out successfully');

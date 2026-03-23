@@ -4,12 +4,14 @@ import adminRoutes from './admin/index';
 import uploadRoutes from './upload.routes';
 import merchantRoutes from './merchant/index';
 import ttsRoutes from './tts.routes';
+import touristRoutes from './tourist/index';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
 router.use('/merchant', merchantRoutes);
+router.use('/tourist', touristRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/tts', ttsRoutes);
 

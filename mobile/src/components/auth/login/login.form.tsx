@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,20 +12,54 @@ import {
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { authStyles, COLORS } from '../../../styles/auth.styles';
+import { loginSchema } from '../../../libs/validation/auth/login.schema';
+import { useAuthStore } from '../../../stores/auth.store';
+import type { AuthStore } from '../../../stores/auth.store';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
-  const handleLogin = () => {
-    // Just a design demo
-    console.log('Login pressed');
+  const loginTourist = useAuthStore((state: AuthStore) => state.loginTourist);
+  const isLoading = useAuthStore((state: AuthStore) => state.isLoading);
+  const clearError = useAuthStore((state: AuthStore) => state.clearError);
+
+  const handleLogin = async () => {
+    clearError();
+
+    const parsed = loginSchema.safeParse({ email, password });
+    if (!parsed.success) {
+      const errors = parsed.error.flatten().fieldErrors;
+      setFieldErrors({
+        email: errors.email?.[0],
+        password: errors.password?.[0],
+      });
+      return;
+    }
+
+    setFieldErrors({});
+    const success = await loginTourist(parsed.data);
+    if (success) {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    const latestError = useAuthStore.getState().error;
+    if (latestError) {
+      Alert.alert('Login error', latestError);
+    }
   };
 
   const navigateToRegister = () => {
     router.push('/auth/register');
+  };
+
+  const navigateToForgotPassword = () => {
+    router.push('/auth/forgot-password');
   };
 
   return (
@@ -91,13 +125,19 @@ const LoginScreen = () => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={authStyles.forgotPasswordContainer}>
+            <TouchableOpacity style={authStyles.forgotPasswordContainer} onPress={navigateToForgotPassword}>
               <Text style={authStyles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={authStyles.button} onPress={handleLogin}>
-              <Text style={authStyles.buttonText}>LOGIN</Text>
+            <TouchableOpacity style={authStyles.button} onPress={handleLogin} disabled={isLoading}>
+              <Text style={authStyles.buttonText}>{isLoading ? 'LOADING...' : 'LOGIN'}</Text>
             </TouchableOpacity>
+
+            {(fieldErrors.email || fieldErrors.password) && (
+              <Text style={{ color: COLORS.error, marginBottom: 10 }}>
+                {fieldErrors.email || fieldErrors.password}
+              </Text>
+            )}
 
             <View style={authStyles.dividerContainer}>
               <View style={authStyles.divider} />

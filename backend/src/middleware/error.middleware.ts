@@ -24,7 +24,7 @@ export const errorMiddleware = (
       sendError(res, `A record with this ${fields.join(', ')} already exists.`, StatusCodes.CONFLICT);
       return;
     }
-    if (err.code === 'P2025') {
+    if (err.code === 'P2026') {
       sendError(res, 'Record not found.', StatusCodes.NOT_FOUND);
       return;
     }
