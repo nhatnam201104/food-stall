@@ -56,12 +56,9 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
 				address: values.address,
 				latitude: Number(values.latitude),
 				longitude: Number(values.longitude),
-				radiusMeters: Number(values.radiusMeters || 15),
-				priority: Number(values.priority || 1),
 				audioMode: values.audioMode,
 				ttsContent: values.audioMode === 'tts' ? values.ttsContent : undefined,
 				audioUrl: values.audioMode === 'file' ? audioUrl : undefined,
-				cooldownSeconds: Number(values.cooldownSeconds || 30),
 				imageUrl,
 			});
 
@@ -140,12 +137,6 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
 			<Row gutter={12}>
 				<Col xs={24} md={12}><Form.Item label="Latitude" name="latitude" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item></Col>
 				<Col xs={24} md={12}><Form.Item label="Longitude" name="longitude" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} /></Form.Item></Col>
-			</Row>
-
-			<Row gutter={12}>
-				<Col xs={24} md={8}><Form.Item label="Radius" name="radiusMeters" initialValue={15}><InputNumber style={{ width: '100%' }} min={10} max={500} /></Form.Item></Col>
-				<Col xs={24} md={8}><Form.Item label="Priority" name="priority" initialValue={1}><InputNumber style={{ width: '100%' }} min={1} max={10} /></Form.Item></Col>
-				<Col xs={24} md={8}><Form.Item label="Cooldown" name="cooldownSeconds" initialValue={30}><InputNumber style={{ width: '100%' }} min={5} max={600} /></Form.Item></Col>
 			</Row>
 
 			<Form.Item label="Image">

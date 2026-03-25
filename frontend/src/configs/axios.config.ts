@@ -24,8 +24,13 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/auth/admin-login';
+      const pathname = window.location.pathname;
+      const isAuthPage = pathname.startsWith('/auth/');
+      if (!isAuthPage) {
+        const redirectTo = pathname.startsWith('/merchant/')
+          ? '/auth/merchant/login'
+          : '/auth/admin/login';
+        window.location.href = redirectTo;
       }
     }
     return Promise.reject(error);

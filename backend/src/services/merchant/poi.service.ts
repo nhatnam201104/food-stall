@@ -5,6 +5,7 @@ import { POI_APPROVAL_STATUS, POI_AUDIO_MODE } from '../../constants/poi.constan
 import { AppError } from '../../errors/app-error';
 import { buildPaginationMeta, parsePagination } from '../../utils/pagination.util';
 import { isWithinVinhKhanhBounds } from '../../utils/map-bound.util';
+import { generatePoiQrCode } from '../../utils/qr.util';
 
 interface UpsertMerchantPoiInput {
   name?: string;
@@ -13,13 +14,10 @@ interface UpsertMerchantPoiInput {
   imageUrl?: string | null;
   latitude?: number;
   longitude?: number;
-  radiusMeters?: number;
-  priority?: number;
   isActive?: boolean;
   audioMode?: string;
   ttsContent?: string | null;
   audioUrl?: string | null;
-  cooldownSeconds?: number;
 }
 
 const MAP_SELECT = {
@@ -132,10 +130,7 @@ const hasMeaningfulPoiChanges = (
     imageUrl: string | null;
     latitude: Prisma.Decimal;
     longitude: Prisma.Decimal;
-    radiusMeters: number;
-    priority: number;
     audioMode: string;
-    cooldownSeconds: number;
   },
   payload: UpsertMerchantPoiInput,
   nextAudio: { ttsContent: string | null; audioUrl: string | null; languageCode: string },
@@ -147,10 +142,7 @@ const hasMeaningfulPoiChanges = (
   if (payload.imageUrl !== undefined && payload.imageUrl !== currentPoi.imageUrl) return true;
   if (payload.latitude !== undefined && Number(currentPoi.latitude) !== payload.latitude) return true;
   if (payload.longitude !== undefined && Number(currentPoi.longitude) !== payload.longitude) return true;
-  if (payload.radiusMeters !== undefined && payload.radiusMeters !== currentPoi.radiusMeters) return true;
-  if (payload.priority !== undefined && payload.priority !== currentPoi.priority) return true;
   if (payload.audioMode !== undefined && payload.audioMode !== currentPoi.audioMode) return true;
-  if (payload.cooldownSeconds !== undefined && payload.cooldownSeconds !== currentPoi.cooldownSeconds) return true;
   if ((currentAudio?.ttsContent ?? null) !== nextAudio.ttsContent) return true;
   if ((currentAudio?.audioUrl ?? null) !== nextAudio.audioUrl) return true;
   if ((currentAudio?.languageCode ?? 'vi') !== nextAudio.languageCode) return true;
@@ -265,11 +257,8 @@ export const merchantPoiService = {
           imageUrl: payload.imageUrl ?? null,
           latitude: payload.latitude,
           longitude: payload.longitude,
-          radiusMeters: payload.radiusMeters ?? 15,
-          priority: payload.priority ?? 1,
           isActive: payload.isActive ?? true,
           audioMode,
-          cooldownSeconds: payload.cooldownSeconds ?? 30,
           approvalStatus: POI_APPROVAL_STATUS.pending,
           reviewNote: null,
           reviewedAt: null,
@@ -285,6 +274,13 @@ export const merchantPoiService = {
           languageCode: audioState.languageCode,
           status: 'active',
         },
+      });
+
+      const qrCodeUrl = await generatePoiQrCode(createdPoi.id);
+
+      await tx.pointOfInterest.update({
+        where: { id: createdPoi.id },
+        data: { qrCodeUrl },
       });
 
       const detail = await tx.pointOfInterest.findUnique({
@@ -317,12 +313,10 @@ export const merchantPoiService = {
         description: true,
         address: true,
         imageUrl: true,
+        qrCodeUrl: true,
         latitude: true,
         longitude: true,
-        radiusMeters: true,
-        priority: true,
         audioMode: true,
-        cooldownSeconds: true,
         approvalStatus: true,
         poiAudio: {
           select: {
@@ -367,11 +361,8 @@ export const merchantPoiService = {
           ...(payload.imageUrl !== undefined && { imageUrl: payload.imageUrl ?? null }),
           ...(payload.latitude !== undefined && { latitude: payload.latitude }),
           ...(payload.longitude !== undefined && { longitude: payload.longitude }),
-          ...(payload.radiusMeters !== undefined && { radiusMeters: payload.radiusMeters }),
-          ...(payload.priority !== undefined && { priority: payload.priority }),
           ...(payload.isActive !== undefined && { isActive: payload.isActive }),
           ...(payload.audioMode !== undefined && { audioMode: payload.audioMode }),
-          ...(payload.cooldownSeconds !== undefined && { cooldownSeconds: payload.cooldownSeconds }),
           ...(shouldResetApproval
             ? {
                 approvalStatus: POI_APPROVAL_STATUS.pending,

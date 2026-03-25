@@ -5,6 +5,7 @@ import AdminAnalyticsPage from '../pages/admin/analytics.page';
 import AdminDashboardPage from '../pages/admin/dashboard.page';
 import AdminPoisPage from '../pages/admin/pois.page';
 import AdminPoisMapPage from '../pages/admin/pois-map.page';
+import AdminPoisDetailPage from '../pages/admin/pois-detail.page';
 import AdminToursPage from '../pages/admin/tours.page';
 import AdminToursCreatePage from '../pages/admin/tours-create.page';
 import AdminToursEditPage from '../pages/admin/tours-edit.page';
@@ -20,6 +21,7 @@ const adminRoutes = (
 				<Route path="dashboard" element={<AdminDashboardPage />} />
 				<Route path="users" element={<AdminUsersPage />} />
 				<Route path="pois" element={<AdminPoisPage />} />
+				<Route path="pois/:id" element={<AdminPoisDetailPage />} />
 				<Route path="pois/map" element={<AdminPoisMapPage />} />
 				<Route path="tours" element={<AdminToursPage />} />
 				<Route path="tours/create" element={<AdminToursCreatePage />} />

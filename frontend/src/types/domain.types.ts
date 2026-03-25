@@ -51,6 +51,7 @@ export interface PointOfInterest {
   description?: string | null;
   address?: string | null;
   imageUrl?: string | null;
+  qrCodeUrl?: string | null;
   latitude: number;
   longitude: number;
   radiusMeters: number;

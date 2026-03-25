@@ -7,6 +7,7 @@ model PointOfInterest {
   description     String?  @db.Text
   address         String?  @db.Text
   imageUrl        String?  @map("image_url") @db.VarChar(500)
+  qrCodeUrl       String?  @map("qr_code_url") @db.VarChar(500)
   latitude        Decimal  @db.Decimal(10, 7)
   longitude       Decimal  @db.Decimal(10, 7)
   radiusMeters    Int      @default(15) @map("radius_meters")

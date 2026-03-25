@@ -20,7 +20,7 @@ import { PageContainer, StatsCard } from '../../shared';
 import {
   type MerchantOverview,
   type MerchantTopPoi,
-  type InteractionHistory,
+  type InteractionHistoryItem,
   merchantAnalyticsService,
 } from '../../../services/merchant/analytics.service';
 
@@ -43,7 +43,7 @@ const MerchantDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState<MerchantOverview | null>(null);
   const [topPois, setTopPois] = useState<MerchantTopPoi[]>([]);
-  const [recentInteractions, setRecentInteractions] = useState<InteractionHistory[]>([]);
+  const [recentInteractions, setRecentInteractions] = useState<InteractionHistoryItem[]>([]);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('7days');
 
   useEffect(() => {

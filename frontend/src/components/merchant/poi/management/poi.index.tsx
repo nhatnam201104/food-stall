@@ -2,13 +2,16 @@ import { Badge, Button, Drawer, Form, Input, InputNumber, Popconfirm, Select, Sp
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { ROUTES } from '../../../../constants';
 import { merchantPoiService } from '../../../../services/merchant/poi.service';
 import { uploadService } from '../../../../services/upload.service';
 import type { PointOfInterest } from '../../../../types';
 import { CustomPagination, PageContainer, PoiAudioPreview, PoiMap, StatusBadge, TableShell } from '../../../shared';
 
 const MerchantPoiManagement = () => {
+	const navigate = useNavigate();
 	const [form] = Form.useForm();
 	const [data, setData] = useState<PointOfInterest[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -58,9 +61,6 @@ const MerchantPoiManagement = () => {
 			address: poi.address,
 			latitude: Number(poi.latitude),
 			longitude: Number(poi.longitude),
-			radiusMeters: poi.radiusMeters,
-			priority: poi.priority,
-			cooldownSeconds: poi.cooldownSeconds,
 			audioMode: poi.audioMode,
 			ttsContent: currentAudio?.ttsContent || undefined,
 			isActive: poi.isActive,
@@ -118,9 +118,6 @@ const MerchantPoiManagement = () => {
 				address: values.address,
 				latitude: Number(values.latitude),
 				longitude: Number(values.longitude),
-				radiusMeters: Number(values.radiusMeters),
-				priority: Number(values.priority),
-				cooldownSeconds: Number(values.cooldownSeconds),
 				audioMode: values.audioMode,
 				ttsContent: values.audioMode === 'tts' ? values.ttsContent : undefined,
 				audioUrl: values.audioMode === 'file' ? nextAudioUrl : undefined,
@@ -154,13 +151,14 @@ const MerchantPoiManagement = () => {
 		{ title: 'Coordinates', key: 'coordinates', render: (_, row) => `${Number(row.latitude).toFixed(5)}, ${Number(row.longitude).toFixed(5)}` },
 		{ title: 'Actions', key: 'actions', render: (_, row) => (
 			<Space>
+				<Button size="small" onClick={() => navigate(`${ROUTES.merchant.pois}/${row.id}`)}>Detail</Button>
 				<Button size="small" onClick={() => openEditor(row)}>Edit</Button>
 				<Popconfirm title="Delete this POI?" onConfirm={() => onDelete(row.id)}>
 					<Button size="small" danger>Delete</Button>
 				</Popconfirm>
 			</Space>
 		) },
-	], []);
+	], [navigate]);
 
 	return (
 		<PageContainer title="POI Management" subtitle="Manage POIs owned by your merchant account">
@@ -223,11 +221,6 @@ const MerchantPoiManagement = () => {
 						<Form.Item label="Latitude" name="latitude" rules={[{ required: true }]} style={{ flex: 1 }}><InputNumber style={{ width: '100%' }} /></Form.Item>
 						<Form.Item label="Longitude" name="longitude" rules={[{ required: true }]} style={{ flex: 1 }}><InputNumber style={{ width: '100%' }} /></Form.Item>
 					</Space>
-					<Space style={{ width: '100%' }}>
-						<Form.Item label="Radius" name="radiusMeters" style={{ flex: 1 }}><InputNumber style={{ width: '100%' }} min={10} max={500} /></Form.Item>
-						<Form.Item label="Priority" name="priority" style={{ flex: 1 }}><InputNumber style={{ width: '100%' }} min={1} max={10} /></Form.Item>
-					</Space>
-					<Form.Item label="Cooldown" name="cooldownSeconds"><InputNumber style={{ width: '100%' }} min={5} max={600} /></Form.Item>
 					<Form.Item label="Audio Mode" name="audioMode" rules={[{ required: true, message: 'Audio mode is required' }]}>
 						<Select options={[{ value: 'tts', label: 'TTS (Text to Speech)' }, { value: 'file', label: 'Audio File' }]} />
 					</Form.Item>

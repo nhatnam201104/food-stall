@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
 import L from 'leaflet';
+import { useMemo } from 'react';
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMapEvents } from 'react-leaflet';
 import { VINH_KHANH_MAP } from '../../../constants';
 import type { PointOfInterest } from '../../../types';
@@ -54,11 +54,6 @@ const PickPositionLayer = ({ onPickPosition }: { onPickPosition?: (latitude: num
 };
 
 const PoiMap = ({ pois = [], markers, routePath, height = 500, selectedPosition, onPickPosition, onMarkerClick }: PoiMapProps) => {
-  const bounds = useMemo(
-    () => [VINH_KHANH_MAP.bounds.southWest, VINH_KHANH_MAP.bounds.northEast] as [[number, number], [number, number]],
-    []
-  );
-
   const effectiveMarkers = useMemo(
     () => markers || pois.map((poi, index) => ({
       id: poi.id,
@@ -77,8 +72,6 @@ const PoiMap = ({ pois = [], markers, routePath, height = 500, selectedPosition,
       <MapContainer
         center={VINH_KHANH_MAP.center}
         zoom={VINH_KHANH_MAP.zoom}
-        maxBounds={bounds}
-        maxBoundsViscosity={1.0}
         style={{ width: '100%', height: '100%' }}
       >
         <TileLayer

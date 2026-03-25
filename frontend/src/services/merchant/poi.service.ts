@@ -17,13 +17,10 @@ export interface MerchantPoiPayload {
   imageUrl?: string;
   latitude: number;
   longitude: number;
-  radiusMeters?: number;
-  priority?: number;
   isActive?: boolean;
   audioMode: 'tts' | 'file';
   ttsContent?: string;
   audioUrl?: string;
-  cooldownSeconds?: number;
 }
 
 export const merchantPoiService = {

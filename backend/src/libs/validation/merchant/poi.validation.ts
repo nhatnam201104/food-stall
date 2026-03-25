@@ -22,8 +22,6 @@ export const createMerchantPoiValidation = [
   }),
   body('latitude').notEmpty().withMessage('Latitude is required').isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90').toFloat(),
   body('longitude').notEmpty().withMessage('Longitude is required').isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180').toFloat(),
-  body('radiusMeters').optional().isInt({ min: 10, max: 500 }).withMessage('Radius must be between 10 and 500').toInt(),
-  body('priority').optional().isInt({ min: 1, max: 10 }).withMessage('Priority must be between 1 and 10').toInt(),
   body('audioMode').notEmpty().withMessage('audioMode is required').isIn(Object.values(POI_AUDIO_MODE)).withMessage('audioMode must be tts or file'),
   body('ttsContent').optional({ nullable: true }).trim().isLength({ max: 10000 }).withMessage('TTS content must not exceed 10000 characters'),
   body('audioUrl').optional({ nullable: true, checkFalsy: true }).custom((val) => {
@@ -33,7 +31,6 @@ export const createMerchantPoiValidation = [
     if (!isFullUrl && !isRelativePath) throw new Error('Audio URL must be a valid URL or path');
     return true;
   }),
-  body('cooldownSeconds').optional().isInt({ min: 5, max: 600 }).withMessage('Cooldown must be between 5 and 600 seconds').toInt(),
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean').toBoolean(),
   body().custom((_value, { req }) => {
     const audioMode = req.body.audioMode;
@@ -65,8 +62,6 @@ export const updateMerchantPoiValidation = [
   }),
   body('latitude').optional().isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90').toFloat(),
   body('longitude').optional().isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180').toFloat(),
-  body('radiusMeters').optional().isInt({ min: 10, max: 500 }).withMessage('Radius must be between 10 and 500').toInt(),
-  body('priority').optional().isInt({ min: 1, max: 10 }).withMessage('Priority must be between 1 and 10').toInt(),
   body('audioMode').notEmpty().withMessage('audioMode is required').isIn(Object.values(POI_AUDIO_MODE)).withMessage('audioMode must be tts or file'),
   body('ttsContent').optional({ nullable: true }).trim().isLength({ max: 10000 }).withMessage('TTS content must not exceed 10000 characters'),
   body('audioUrl').optional({ nullable: true, checkFalsy: true }).custom((val) => {
@@ -76,7 +71,6 @@ export const updateMerchantPoiValidation = [
     if (!isFullUrl && !isRelativePath) throw new Error('Audio URL must be a valid URL or path');
     return true;
   }),
-  body('cooldownSeconds').optional().isInt({ min: 5, max: 600 }).withMessage('Cooldown must be between 5 and 600 seconds').toInt(),
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean').toBoolean(),
   body().custom((_value, { req }) => {
     const audioMode = req.body.audioMode;

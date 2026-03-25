@@ -20,7 +20,6 @@ export interface MerchantTopPoi {
 }
 
 export interface InteractionHistory {
-  triggerType(triggerType: unknown): import("react").ReactNode;
   interactions: InteractionHistoryItem[];
   pagination: {
     total: number;
