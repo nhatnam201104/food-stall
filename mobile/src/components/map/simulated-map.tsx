@@ -2,6 +2,7 @@ import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, type Region } from 'react-native-maps';
 import type { PoiMarker } from '../../types/tourist.types';
+import { getFullImageUrl } from '../../utils/image-url.util';
 
 interface Bounds {
   minLat: number;
@@ -70,7 +71,7 @@ const SimulatedMapComponent = ({ pois, bounds, onSelectPoi }: SimulatedMapProps)
             >
               <View style={styles.markerWrap} collapsable={false}>
                 {poi.imageUrl ? (
-                  <Image source={{ uri: poi.imageUrl }} style={styles.markerImage} />
+                  <Image source={{ uri: getFullImageUrl(poi.imageUrl) ?? undefined }} style={styles.markerImage} />
                 ) : (
                   <View style={styles.dotOuter}>
                     <View style={styles.dot} />

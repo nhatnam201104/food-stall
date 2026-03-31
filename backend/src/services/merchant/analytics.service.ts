@@ -143,19 +143,13 @@ export const merchantAnalyticsService = {
    * Get top performing POIs for merchant
    */
   async getTopPois(
-    userId: string,
+    merchantId: string,
     query: { limit?: string; from?: string; to?: string },
   ) {
     const { limit = "10", from, to } = query;
     const takeLimit = Math.min(parseInt(limit, 10) || 10, 50);
     const dateFilter = getDateFilter(from, to);
-    var merchant = await prisma.merchant.findUnique({
-      where: { userId },
-    });
-    if (!merchant) {
-      throw new Error("Merchant not found");
-    }
-    const poiIds = await this.getMerchantPoiIds(merchant.id);
+    const poiIds = await this.getMerchantPoiIds(merchantId);
 
     if (poiIds.length === 0) {
       return { topPois: [] };
@@ -294,21 +288,14 @@ export const merchantAnalyticsService = {
    * Get POI-specific analytics
    */
   async getPoiAnalytics(
-    userId: string,
+    merchantId: string,
     poiId: string,
     query: { from?: string; to?: string },
   ) {
     const { from, to } = query;
     const dateFilter = getDateFilter(from, to);
-    const merchant = await prisma.merchant.findUnique({
-      where: { userId },
-    });
-    if (!merchant) {
-      throw new Error("Merchant not found");
-    }
-    // Verify ownership
     const poi = await prisma.pointOfInterest.findFirst({
-      where: { id: poiId, merchantId: merchant.id, isDeleted: false },
+      where: { id: poiId, merchantId, isDeleted: false },
     });
 
     if (!poi) {

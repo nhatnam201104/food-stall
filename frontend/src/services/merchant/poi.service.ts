@@ -19,6 +19,7 @@ export interface MerchantPoiPayload {
   longitude: number;
   isActive?: boolean;
   audioMode: 'tts' | 'file';
+  /** Multi-language TTS content: { vi: "...", en: "...", zh: "..." } */
   ttsContent?: string;
   audioUrl?: string;
 }

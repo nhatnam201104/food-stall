@@ -1,8 +1,36 @@
 import { Router } from 'express';
+import { prisma } from '../../config/database';
 import { merchantAnalyticsService } from '../../services/merchant/analytics.service';
+import { AppError } from '../../errors/app-error';
 import { sendSuccess } from '../../utils/response.util';
 
 const router = Router();
+
+/** Get merchantId from authenticated userId */
+const getMerchantId = async (userId: string): Promise<string> => {
+  const merchant = await prisma.merchant.findUnique({ where: { userId } });
+  if (!merchant) throw AppError.forbidden('Merchant profile not found');
+  return merchant.id;
+};
+
+/**
+ * @route   GET /api/merchant/analytics/summary
+ * @desc    Get summary stats for merchant: total listens, avg listening time, completion rate, active POIs
+ * @access  Private (Merchant only)
+ * @query   from - Date filter: 'today', '7days', '30days', or ISO date
+ * @query   to - End date filter (ISO date)
+ */
+router.get('/summary', async (req, res, next) => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) return res.status(403).json({ success: false, message: 'Access denied' });
+    const merchantId = await getMerchantId(userId);
+    const data = await merchantAnalyticsService.getOverview(merchantId, req);
+    sendSuccess(res, data, 'Summary retrieved successfully');
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * @route   GET /api/merchant/analytics/overview
@@ -13,13 +41,10 @@ const router = Router();
  */
 router.get('/overview', async (req, res, next) => {
   try {
-    // userId is attached by auth middleware
     const userId = (req as any).user?.userId;
-    console.log(`Fetching dashboard overview for merchant ${req.user?.userId}`);
-    if (!userId) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
-    const data = await merchantAnalyticsService.getOverview(userId, req);
+    if (!userId) return res.status(403).json({ success: false, message: 'Access denied' });
+    const merchantId = await getMerchantId(userId);
+    const data = await merchantAnalyticsService.getOverview(merchantId, req);
     sendSuccess(res, data, 'Dashboard overview retrieved successfully');
   } catch (error) {
     next(error);
@@ -37,10 +62,9 @@ router.get('/overview', async (req, res, next) => {
 router.get('/top-pois', async (req, res, next) => {
   try {
     const userId = (req as any).user?.userId;
-    if (!userId) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
-    const data = await merchantAnalyticsService.getTopPois(userId, req.query as any);
+    if (!userId) return res.status(403).json({ success: false, message: 'Access denied' });
+    const merchantId = await getMerchantId(userId);
+    const data = await merchantAnalyticsService.getTopPois(merchantId, req.query as any);
     sendSuccess(res, data, 'Top POIs retrieved successfully');
   } catch (error) {
     next(error);
@@ -60,10 +84,9 @@ router.get('/top-pois', async (req, res, next) => {
 router.get('/history', async (req, res, next) => {
   try {
     const userId = (req as any).user?.userId;
-    if (!userId) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
-    const data = await merchantAnalyticsService.getInteractionHistory(userId, req.query as any);
+    if (!userId) return res.status(403).json({ success: false, message: 'Access denied' });
+    const merchantId = await getMerchantId(userId);
+    const data = await merchantAnalyticsService.getInteractionHistory(merchantId, req.query as any);
     sendSuccess(res, data, 'Interaction history retrieved successfully');
   } catch (error) {
     next(error);
@@ -80,11 +103,10 @@ router.get('/history', async (req, res, next) => {
 router.get('/pois/:poiId', async (req, res, next) => {
   try {
     const userId = (req as any).user?.userId;
-    if (!userId) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
-    }
+    if (!userId) return res.status(403).json({ success: false, message: 'Access denied' });
+    const merchantId = await getMerchantId(userId);
     const data = await merchantAnalyticsService.getPoiAnalytics(
-      userId,
+      merchantId,
       req.params.poiId,
       req.query as any,
     );
