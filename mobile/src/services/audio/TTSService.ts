@@ -2,6 +2,7 @@ import axiosInstance from '../../configs/axios.config';
 import { audioCache } from './AudioCache';
 import { detectDeviceLanguage, toTtsLanguage } from '../../utils/language.util';
 import type { SupportedLanguage } from '../../utils/language.util';
+import { poiService } from '../poi.service';
 
 /**
  * Convert an ArrayBuffer to a base64 string (React Native compatible).
@@ -38,8 +39,7 @@ class TTSService {
   ): Promise<string> {
     // 1. Cache first (key includes language for multilingual support)
     const deviceLang = languageOverride ?? detectDeviceLanguage();
-    const cacheKey = `${poiId}_${deviceLang}`;
-    const cached = await audioCache.get(cacheKey);
+    const cached = await audioCache.get(poiId, deviceLang);
     if (cached) return cached;
 
     // 2. Call backend TTS endpoint with device language
@@ -58,7 +58,7 @@ class TTSService {
     const base64 = arrayBufferToBase64(response.data as ArrayBuffer);
 
     // 4. Save to cache and return file URI
-    const fileUri = audioCache.set(cacheKey, base64);
+    const fileUri = audioCache.set(poiId, deviceLang, base64);
     return fileUri;
   }
 
@@ -69,9 +69,9 @@ class TTSService {
    * @param audioUrl - remote URL
    * @returns local file URI
    */
-  async downloadAndCache(poiId: string, audioUrl: string): Promise<string> {
+  async downloadAndCache(poiId: string, audioUrl: string, language: SupportedLanguage): Promise<string> {
     // 1. Cache first
-    const cached = await audioCache.get(poiId);
+    const cached = await audioCache.get(poiId, language);
     if (cached) return cached;
 
     // 2. Download binary
@@ -84,15 +84,24 @@ class TTSService {
 
     // 3. Convert and cache
     const base64 = arrayBufferToBase64(response.data as ArrayBuffer);
-    const fileUri = audioCache.set(poiId, base64);
+    const fileUri = audioCache.set(poiId, language, base64);
     return fileUri;
+  }
+
+  async downloadPoiAudioByLanguage(poiId: string, language: SupportedLanguage): Promise<string> {
+    const cached = await audioCache.get(poiId, language);
+    if (cached) return cached;
+
+    const data = await poiService.audioByLanguage(poiId, language);
+    const base64 = arrayBufferToBase64(data);
+    return audioCache.set(poiId, language, base64);
   }
 
   /**
    * Evict cached audio for a POI (e.g. when POI content changes).
    */
-  invalidateCache(poiId: string): void {
-    audioCache.invalidate(poiId);
+  invalidateCache(poiId: string, language: SupportedLanguage): void {
+    audioCache.invalidate(poiId, language);
   }
 }
 

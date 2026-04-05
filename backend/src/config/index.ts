@@ -51,4 +51,17 @@ export const config = {
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
     authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '10', 10),
   },
+
+  request: {
+    bodyLimitMb: parseInt(process.env.REQUEST_BODY_LIMIT_MB || '50', 10),
+  },
+
+  tts: {
+    provider: (process.env.TTS_PROVIDER || 'xai') as 'xai' | 'google',
+    fallbackProvider: (process.env.TTS_FALLBACK_PROVIDER || 'google') as 'xai' | 'google' | 'none',
+    xaiApiKey: process.env.XAI_API_KEY || '',
+    xaiVoiceId: process.env.XAI_TTS_VOICE_ID || 'eve',
+    xaiTranslateModel: process.env.XAI_TRANSLATE_MODEL || 'grok-4',
+    forceTranslationForExplicitLanguage: process.env.TTS_FORCE_TRANSLATION_FOR_EXPLICIT_LANGUAGE !== 'false',
+  },
 } as const;

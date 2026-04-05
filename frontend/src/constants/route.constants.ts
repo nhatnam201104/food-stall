@@ -30,6 +30,7 @@ export const ROUTES = {
     profile: '/merchant/profile',
     pois: '/merchant/pois',
     poisDetail: '/merchant/pois/:id',
+    poisEdit: '/merchant/pois/:id/edit',
     poisCreate: '/merchant/pois/create',
     poisMap: '/merchant/pois/map',
     history: '/merchant/history',

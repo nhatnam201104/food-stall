@@ -1,4 +1,4 @@
-import { Button, Col, Form, Input, InputNumber, Row, Select, Upload } from 'antd';
+import { Button, Col, Form, Input, InputNumber, Row, Upload } from 'antd';
 import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -14,16 +14,10 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
 	const [form] = Form.useForm();
 	const [loading, setLoading] = useState(false);
 	const [imageFile, setImageFile] = useState<File | null>(null);
-	const [audioFile, setAudioFile] = useState<File | null>(null);
 	const [pickedPosition, setPickedPosition] = useState<{ latitude: number; longitude: number } | null>(null);
 
 	const beforeUpload: UploadProps['beforeUpload'] = (file) => {
 		setImageFile(file as File);
-		return false;
-	};
-
-	const beforeAudioUpload: UploadProps['beforeUpload'] = (file) => {
-		setAudioFile(file as File);
 		return false;
 	};
 
@@ -33,21 +27,9 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
 			setLoading(true);
 
 			let imageUrl: string | undefined;
-			let audioUrl: string | undefined;
 			if (imageFile) {
 				const uploadRes = await uploadService.uploadImage(imageFile);
 				imageUrl = uploadRes.data?.url;
-			}
-
-			if (values.audioMode === 'file') {
-				if (!audioFile) {
-					toast.error('Please upload an audio file when audio mode is File');
-					setLoading(false);
-					return;
-				}
-
-				const uploadAudioRes = await uploadService.uploadAudio(audioFile);
-				audioUrl = uploadAudioRes.data?.url;
 			}
 
 			await merchantPoiService.create({
@@ -56,16 +38,14 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
 				address: values.address,
 				latitude: Number(values.latitude),
 				longitude: Number(values.longitude),
-				audioMode: values.audioMode,
-				ttsContent: values.audioMode === 'tts' ? values.ttsContent : undefined,
-				audioUrl: values.audioMode === 'file' ? audioUrl : undefined,
+				audioMode: 'tts',
+				ttsContent: values.ttsContent,
 				imageUrl,
 			});
 
 			toast.success('POI created and submitted for approval');
 			form.resetFields();
 			setImageFile(null);
-			setAudioFile(null);
 			setPickedPosition(null);
 			onCreated?.();
 		} catch (err: unknown) {
@@ -83,53 +63,27 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
 				<Col xs={24} md={12}><Form.Item label="Address" name="address" rules={[{ required: true, message: 'Address is required' }]}><Input /></Form.Item></Col>
 			</Row>
 			<Form.Item label="Description" name="description"><Input.TextArea rows={3} /></Form.Item>
+			<Form.Item name="audioMode" hidden><Input /></Form.Item>
 
-			<Row gutter={12}>
-				<Col xs={24} md={12}>
-					<Form.Item label="Audio Mode" name="audioMode" rules={[{ required: true, message: 'Audio mode is required' }]}>
-						<Select options={[{ value: 'tts', label: 'TTS (Text to Speech)' }, { value: 'file', label: 'Audio File' }]} />
-					</Form.Item>
-				</Col>
-			</Row>
 			<Form.Item shouldUpdate noStyle>
 				{() => (
 					<>
-						{form.getFieldValue('audioMode') === 'tts' && (
-							<>
-								<Form.Item
-									label="TTS Content"
-									name="ttsContent"
-									rules={[{ required: true, message: 'TTS content is required in TTS mode' }]}
-								>
-									<Input.TextArea rows={4} placeholder="Enter text to convert to speech" />
-								</Form.Item>
-								<Form.Item shouldUpdate noStyle>
-									{() => (
-										<PoiAudioPreview
-											audioMode="tts"
-											ttsContent={form.getFieldValue('ttsContent')}
-											languageCode="vi"
-										/>
-									)}
-								</Form.Item>
-							</>
-						)}
-
-						{form.getFieldValue('audioMode') === 'file' && (
-							<>
-								<Form.Item label="Audio File" required>
-									<Upload
-										beforeUpload={beforeAudioUpload}
-										maxCount={1}
-										accept="audio/*"
-										fileList={audioFile ? ([{ uid: 'new-audio', name: audioFile.name, status: 'done' } as UploadFile]) : []}
-									>
-										<Button>Choose audio</Button>
-									</Upload>
-								</Form.Item>
-								<PoiAudioPreview audioMode="file" localAudioFile={audioFile} />
-							</>
-						)}
+						<Form.Item
+							label="TTS Content"
+							name="ttsContent"
+							rules={[{ required: true, message: 'TTS content is required' }]}
+						>
+							<Input.TextArea rows={4} autoSize={{ minRows: 4, maxRows: 12 }} showCount placeholder="Enter text to convert to speech" />
+						</Form.Item>
+						<Form.Item shouldUpdate noStyle>
+							{() => (
+								<PoiAudioPreview
+									audioMode="tts"
+									ttsContent={form.getFieldValue('ttsContent')}
+									languageCode="vi"
+								/>
+							)}
+						</Form.Item>
 					</>
 				)}
 			</Form.Item>

@@ -28,17 +28,17 @@ class AudioCache {
   }
 
   // ─── Key / path helpers ────────────────────────────────────────────────────
-  private getMemKey(poiId: string): string {
-    return `poi_${poiId}`;
+  private getMemKey(poiId: string, language: string): string {
+    return `poi_${poiId}_${language}`;
   }
 
-  private getFileRef(poiId: string): File {
-    return new File(getAudioCacheDir(), `poi_${poiId}.mp3`);
+  private getFileRef(poiId: string, language: string): File {
+    return new File(getAudioCacheDir(), `poi_${poiId}_${language}.mp3`);
   }
 
   // ─── Get cached audio URI ──────────────────────────────────────────────────
-  async get(poiId: string): Promise<string | null> {
-    const key = this.getMemKey(poiId);
+  async get(poiId: string, language: string): Promise<string | null> {
+    const key = this.getMemKey(poiId, language);
 
     // 1. In-memory hit → verify disk file still present
     const memEntry = this.memCache.get(key);
@@ -51,12 +51,13 @@ class AudioCache {
     }
 
     // 2. Disk check
-    const fileRef = this.getFileRef(poiId);
+    const fileRef = this.getFileRef(poiId, language);
     if (!fileRef.exists) return null;
 
     // Re-hydrate mem cache
     const entry: CachedAudioEntry = {
       poiId,
+      language,
       fileUri: fileRef.uri,
       createdAt: Date.now(),
       ttl: DEFAULT_TTL_MS,
@@ -66,27 +67,28 @@ class AudioCache {
   }
 
   // ─── Save base64 audio to cache ────────────────────────────────────────────
-  set(poiId: string, base64Data: string): string {
+  set(poiId: string, language: string, base64Data: string): string {
     this.ensureCacheDir();
-    const fileRef = this.getFileRef(poiId);
+    const fileRef = this.getFileRef(poiId, language);
 
     // write() with base64 encoding - synchronous in new File API
     fileRef.write(base64Data, { encoding: 'base64' });
 
     const entry: CachedAudioEntry = {
       poiId,
+      language,
       fileUri: fileRef.uri,
       createdAt: Date.now(),
       ttl: DEFAULT_TTL_MS,
     };
-    this.memCache.set(this.getMemKey(poiId), entry);
+    this.memCache.set(this.getMemKey(poiId, language), entry);
     return fileRef.uri;
   }
 
   // ─── Invalidate single entry ───────────────────────────────────────────────
-  invalidate(poiId: string): void {
-    this.memCache.delete(this.getMemKey(poiId));
-    const fileRef = this.getFileRef(poiId);
+  invalidate(poiId: string, language: string): void {
+    this.memCache.delete(this.getMemKey(poiId, language));
+    const fileRef = this.getFileRef(poiId, language);
     if (fileRef.exists) {
       fileRef.delete();
     }

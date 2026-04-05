@@ -49,6 +49,13 @@ export const merchantPoiController = {
     } catch (err) { next(err); }
   },
 
+  async resubmit(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const poi = await merchantPoiService.resubmit(getId(req), getUserId(req as AuthenticatedRequest));
+      sendSuccess(res, poi, 'POI resubmitted for review successfully');
+    } catch (err) { next(err); }
+  },
+
   async remove(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       await merchantPoiService.remove(getId(req), getUserId(req as AuthenticatedRequest));

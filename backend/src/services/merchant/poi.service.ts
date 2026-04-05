@@ -6,6 +6,8 @@ import { AppError } from '../../errors/app-error';
 import { buildPaginationMeta, parsePagination } from '../../utils/pagination.util';
 import { isWithinVinhKhanhBounds } from '../../utils/map-bound.util';
 import { generatePoiQrCode } from '../../utils/qr.util';
+import { ttsService } from '../tts.service';
+import { deletePoiAudioFileByUrl, savePoiAudioBuffer } from '../../utils/poi-audio-file.util';
 
 interface UpsertMerchantPoiInput {
   name?: string;
@@ -17,7 +19,6 @@ interface UpsertMerchantPoiInput {
   isActive?: boolean;
   audioMode?: string;
   ttsContent?: string | null;
-  audioUrl?: string | null;
 }
 
 const MAP_SELECT = {
@@ -74,37 +75,27 @@ const normalizeNullableText = (value?: string | null): string | null => {
   return normalized.length ? normalized : null;
 };
 
-const resolveAudioState = (
-  audioMode: string,
-  payload: Pick<UpsertMerchantPoiInput, 'ttsContent' | 'audioUrl'>,
-): { ttsContent: string | null; audioUrl: string | null; languageCode: string } => {
-  const payloadTts = normalizeNullableText(payload.ttsContent);
-  const payloadAudioUrl = normalizeNullableText(payload.audioUrl);
-
-  if (audioMode === POI_AUDIO_MODE.tts) {
-    const nextTtsContent = payloadTts;
-
-    if (!nextTtsContent) {
-      throw AppError.badRequest('ttsContent is required when audioMode is tts');
-    }
-
-    return {
-      ttsContent: nextTtsContent,
-      audioUrl: null,
-      languageCode: 'vi',
-    };
+const resolveTtsContent = (value?: string | null): string => {
+  const normalized = normalizeNullableText(value);
+  if (!normalized) {
+    throw AppError.badRequest('ttsContent is required');
   }
+  return normalized;
+};
 
-  const nextAudioUrl = payloadAudioUrl;
-
-  if (!nextAudioUrl) {
-    throw AppError.badRequest('audioUrl is required when audioMode is file');
-  }
-
+const generatePersistedAudio = async (
+  poiId: string,
+  ttsContent: string,
+  languageCode: string,
+): Promise<{ ttsContent: string; languageCode: string; audioUrl: string; fileSizeBytes: bigint; status: string }> => {
+  const audioBuffer = await ttsService.generatePreviewAudio(ttsContent, languageCode, 'vi');
+  const saved = savePoiAudioBuffer(audioBuffer, poiId, languageCode);
   return {
-    ttsContent: null,
-    audioUrl: nextAudioUrl,
-    languageCode: 'vi',
+    ttsContent,
+    languageCode,
+    audioUrl: saved.audioUrl,
+    fileSizeBytes: saved.fileSizeBytes,
+    status: 'active',
   };
 };
 
@@ -120,33 +111,6 @@ const assertCoordinatesInBounds = (latitude: number, longitude: number): void =>
   if (!isWithinVinhKhanhBounds(latitude, longitude)) {
     throw AppError.badRequest('Coordinates are out of the allowed Vinh Khanh, District 4 area');
   }
-};
-
-const hasMeaningfulPoiChanges = (
-  currentPoi: {
-    name: string;
-    description: string | null;
-    address: string | null;
-    imageUrl: string | null;
-    latitude: Prisma.Decimal;
-    longitude: Prisma.Decimal;
-    audioMode: string;
-  },
-  payload: UpsertMerchantPoiInput,
-  nextAudio: { ttsContent: string | null; audioUrl: string | null; languageCode: string },
-  currentAudio: { ttsContent: string | null; audioUrl: string | null; languageCode: string } | null,
-): boolean => {
-  if (payload.name !== undefined && payload.name !== currentPoi.name) return true;
-  if (payload.description !== undefined && payload.description !== currentPoi.description) return true;
-  if (payload.address !== undefined && payload.address !== currentPoi.address) return true;
-  if (payload.imageUrl !== undefined && payload.imageUrl !== currentPoi.imageUrl) return true;
-  if (payload.latitude !== undefined && Number(currentPoi.latitude) !== payload.latitude) return true;
-  if (payload.longitude !== undefined && Number(currentPoi.longitude) !== payload.longitude) return true;
-  if (payload.audioMode !== undefined && payload.audioMode !== currentPoi.audioMode) return true;
-  if ((currentAudio?.ttsContent ?? null) !== nextAudio.ttsContent) return true;
-  if ((currentAudio?.audioUrl ?? null) !== nextAudio.audioUrl) return true;
-  if ((currentAudio?.languageCode ?? 'vi') !== nextAudio.languageCode) return true;
-  return false;
 };
 
 export const merchantPoiService = {
@@ -244,11 +208,14 @@ export const merchantPoiService = {
 
     assertCoordinatesInBounds(payload.latitude, payload.longitude);
 
-    const audioMode = payload.audioMode ?? POI_AUDIO_MODE.tts;
-    const audioState = resolveAudioState(audioMode, payload);
+    const ttsContent = resolveTtsContent(payload.ttsContent);
+    const audioMode = POI_AUDIO_MODE.tts;
 
-    const poi = await prisma.$transaction(async (tx) => {
-      const createdPoi = await tx.pointOfInterest.create({
+    let createdPoiId: string | null = null;
+    let generatedAudioUrl: string | null = null;
+
+    try {
+      const createdPoi = await prisma.pointOfInterest.create({
         data: {
           merchantId,
           name: payload.name,
@@ -266,24 +233,31 @@ export const merchantPoiService = {
         },
       });
 
-      await tx.poiAudio.create({
-        data: {
-          poiId: createdPoi.id,
-          ttsContent: audioState.ttsContent,
-          audioUrl: audioState.audioUrl,
-          languageCode: audioState.languageCode,
-          status: 'active',
-        },
-      });
+      createdPoiId = createdPoi.id;
 
+      const persistedAudio = await generatePersistedAudio(createdPoi.id, ttsContent, 'en');
+      generatedAudioUrl = persistedAudio.audioUrl;
       const qrCodeUrl = await generatePoiQrCode(createdPoi.id);
 
-      await tx.pointOfInterest.update({
-        where: { id: createdPoi.id },
-        data: { qrCodeUrl },
+      await prisma.$transaction(async (tx) => {
+        await tx.poiAudio.create({
+          data: {
+            poiId: createdPoi.id,
+            ttsContent: persistedAudio.ttsContent,
+            audioUrl: persistedAudio.audioUrl,
+            fileSizeBytes: persistedAudio.fileSizeBytes,
+            languageCode: persistedAudio.languageCode,
+            status: persistedAudio.status,
+          },
+        });
+
+        await tx.pointOfInterest.update({
+          where: { id: createdPoi.id },
+          data: { qrCodeUrl },
+        });
       });
 
-      const detail = await tx.pointOfInterest.findUnique({
+      const detail = await prisma.pointOfInterest.findUnique({
         where: { id: createdPoi.id },
         include: DETAIL_INCLUDE,
       });
@@ -293,9 +267,17 @@ export const merchantPoiService = {
       }
 
       return detail;
-    });
+    } catch (error) {
+      if (generatedAudioUrl) {
+        deletePoiAudioFileByUrl(generatedAudioUrl);
+      }
 
-    return poi;
+      if (createdPoiId) {
+        await prisma.pointOfInterest.delete({ where: { id: createdPoiId } }).catch(() => undefined);
+      }
+
+      throw error;
+    }
   },
 
   async update(id: string, userId: string, payload: UpsertMerchantPoiInput) {
@@ -322,6 +304,8 @@ export const merchantPoiService = {
           select: {
             ttsContent: true,
             audioUrl: true,
+            status: true,
+            id: true,
             languageCode: true,
           },
           orderBy: {
@@ -340,82 +324,117 @@ export const merchantPoiService = {
     const nextLongitude = payload.longitude ?? Number(currentPoi.longitude);
     assertCoordinatesInBounds(nextLatitude, nextLongitude);
 
-    const nextAudioMode = payload.audioMode ?? currentPoi.audioMode;
+    const nextAudioMode = POI_AUDIO_MODE.tts;
     const currentAudio = currentPoi.poiAudio[0] ?? null;
-    const nextAudioPayload = {
-      ttsContent: payload.ttsContent ?? (nextAudioMode === POI_AUDIO_MODE.tts ? currentAudio?.ttsContent ?? null : null),
-      audioUrl: payload.audioUrl ?? (nextAudioMode === POI_AUDIO_MODE.file ? currentAudio?.audioUrl ?? null : null),
-    };
-    const nextAudio = resolveAudioState(nextAudioMode, nextAudioPayload);
+    const nextTtsContent = resolveTtsContent(payload.ttsContent ?? currentAudio?.ttsContent ?? null);
+    const hasTtsContentChanged = (currentAudio?.ttsContent || '').trim() !== nextTtsContent;
 
-    const shouldResetApproval = currentPoi.approvalStatus === POI_APPROVAL_STATUS.approved
-      && hasMeaningfulPoiChanges(currentPoi, payload, nextAudio, currentAudio);
-
-    const poi = await prisma.$transaction(async (tx) => {
-      await tx.pointOfInterest.update({
-        where: { id: currentPoi.id },
-        data: {
-          ...(payload.name !== undefined && { name: payload.name }),
-          ...(payload.description !== undefined && { description: payload.description ?? null }),
-          ...(payload.address !== undefined && { address: payload.address.trim() }),
-          ...(payload.imageUrl !== undefined && { imageUrl: payload.imageUrl ?? null }),
-          ...(payload.latitude !== undefined && { latitude: payload.latitude }),
-          ...(payload.longitude !== undefined && { longitude: payload.longitude }),
-          ...(payload.isActive !== undefined && { isActive: payload.isActive }),
-          ...(payload.audioMode !== undefined && { audioMode: payload.audioMode }),
-          ...(shouldResetApproval
-            ? {
-                approvalStatus: POI_APPROVAL_STATUS.pending,
-                reviewNote: null,
-                reviewedAt: null,
-                reviewedBy: null,
-                submittedAt: new Date(),
-              }
-            : {}),
-        },
-      });
-
-      const existingAudio = await tx.poiAudio.findFirst({
-        where: { poiId: currentPoi.id },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true },
-      });
-
-      if (existingAudio) {
-        await tx.poiAudio.update({
-          where: { id: existingAudio.id },
-          data: {
-            ttsContent: nextAudio.ttsContent,
-            audioUrl: nextAudio.audioUrl,
-            languageCode: nextAudio.languageCode,
-            status: 'active',
-          },
-        });
-      } else {
-        await tx.poiAudio.create({
-          data: {
-            poiId: currentPoi.id,
-            languageCode: nextAudio.languageCode,
-            ttsContent: nextAudio.ttsContent,
-            audioUrl: nextAudio.audioUrl,
-            status: 'active',
-          },
-        });
-      }
-
-      const detail = await tx.pointOfInterest.findUnique({
-        where: { id: currentPoi.id },
-        include: DETAIL_INCLUDE,
-      });
-
-      if (!detail) {
-        throw AppError.notFound('Updated POI not found');
-      }
-
-      return detail;
+    const existingAudios = await prisma.poiAudio.findMany({
+      where: { poiId: currentPoi.id },
+      select: { audioUrl: true },
     });
 
-    return poi;
+    const shouldRegenerate = hasTtsContentChanged || existingAudios.length === 0 || currentPoi.audioMode === POI_AUDIO_MODE.file;
+    let persistedAudio: Awaited<ReturnType<typeof generatePersistedAudio>> | null = null;
+
+    try {
+      if (shouldRegenerate) {
+        persistedAudio = await generatePersistedAudio(currentPoi.id, nextTtsContent, 'en');
+      }
+
+      const poi = await prisma.$transaction(async (tx) => {
+        await tx.pointOfInterest.update({
+          where: { id: currentPoi.id },
+          data: {
+            ...(payload.name !== undefined && { name: payload.name }),
+            ...(payload.description !== undefined && { description: payload.description ?? null }),
+            ...(payload.address !== undefined && { address: payload.address.trim() }),
+            ...(payload.imageUrl !== undefined && { imageUrl: payload.imageUrl ?? null }),
+            ...(payload.latitude !== undefined && { latitude: payload.latitude }),
+            ...(payload.longitude !== undefined && { longitude: payload.longitude }),
+            ...(payload.isActive !== undefined && { isActive: payload.isActive }),
+            audioMode: nextAudioMode,
+          },
+        });
+
+        if (shouldRegenerate && persistedAudio) {
+          await tx.poiAudio.deleteMany({ where: { poiId: currentPoi.id } });
+
+          await tx.poiAudio.create({
+            data: {
+              poiId: currentPoi.id,
+              languageCode: persistedAudio.languageCode,
+              ttsContent: persistedAudio.ttsContent,
+              audioUrl: persistedAudio.audioUrl,
+              fileSizeBytes: persistedAudio.fileSizeBytes,
+              status: persistedAudio.status,
+            },
+          });
+        }
+
+        const detail = await tx.pointOfInterest.findUnique({
+          where: { id: currentPoi.id },
+          include: DETAIL_INCLUDE,
+        });
+
+        if (!detail) {
+          throw AppError.notFound('Updated POI not found');
+        }
+
+        return detail;
+      });
+
+      if (shouldRegenerate) {
+        for (const item of existingAudios) {
+          deletePoiAudioFileByUrl(item.audioUrl);
+        }
+      }
+
+      return poi;
+    } catch (error) {
+      if (persistedAudio?.audioUrl) {
+        deletePoiAudioFileByUrl(persistedAudio.audioUrl);
+      }
+      throw error;
+    }
+  },
+
+  async resubmit(id: string, userId: string) {
+    const merchantId = await getMerchantIdByUserId(userId);
+
+    const poi = await prisma.pointOfInterest.findFirst({
+      where: {
+        id,
+        merchantId,
+        isDeleted: false,
+      },
+      select: {
+        id: true,
+        approvalStatus: true,
+      },
+    });
+
+    if (!poi) {
+      throw AppError.notFound('POI not found');
+    }
+
+    if (poi.approvalStatus !== POI_APPROVAL_STATUS.rejected) {
+      throw AppError.badRequest('Only rejected POIs can be resubmitted');
+    }
+
+    const updated = await prisma.pointOfInterest.update({
+      where: { id: poi.id },
+      data: {
+        approvalStatus: POI_APPROVAL_STATUS.pending,
+        reviewNote: null,
+        reviewedAt: null,
+        reviewedBy: null,
+        submittedAt: new Date(),
+      },
+      include: DETAIL_INCLUDE,
+    });
+
+    return updated;
   },
 
   async remove(id: string, userId: string) {
@@ -429,6 +448,17 @@ export const merchantPoiService = {
     if (!poi) {
       throw AppError.notFound('POI not found');
     }
+
+    const existingAudios = await prisma.poiAudio.findMany({
+      where: { poiId: poi.id },
+      select: { audioUrl: true },
+    });
+
+    for (const item of existingAudios) {
+      deletePoiAudioFileByUrl(item.audioUrl);
+    }
+
+    await prisma.poiAudio.deleteMany({ where: { poiId: poi.id } });
 
     await prisma.pointOfInterest.update({
       where: { id: poi.id },

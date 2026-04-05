@@ -27,8 +27,9 @@ const createApp = () => {
   app.use(globalLimiter);
 
   // ─── Request parsing ───────────────────────────────────────────────────────
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  const requestBodyLimit = `${config.request.bodyLimitMb}mb`;
+  app.use(express.json({ limit: requestBodyLimit }));
+  app.use(express.urlencoded({ extended: true, limit: requestBodyLimit }));
   app.use(compression());
 
   // ─── Logging ───────────────────────────────────────────────────────────────
