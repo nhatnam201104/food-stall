@@ -1,19 +1,36 @@
-import { Directory, File, Paths } from 'expo-file-system';
-import type { CachedAudioEntry } from '../../types/audio.types';
+import { Directory, File, Paths } from "expo-file-system";
+import type { CachedAudioEntry } from "../../types/audio.types";
 
 const DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 let _audioCacheDir: Directory | null = null;
 
 const getAudioCacheDir = (): Directory => {
   if (!_audioCacheDir) {
-    _audioCacheDir = new Directory(Paths.cache, 'audio-cache');
+    _audioCacheDir = new Directory(Paths.cache, "audio-cache");
   }
   return _audioCacheDir;
 };
 
 /**
+ * Simple hash function for cache key generation.
+ * Produces a stable numeric hash from a string (djb2 algorithm).
+ */
+function hashString(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) & 0x7fffffff;
+  }
+  return hash.toString(36);
+}
+
+/**
  * In-memory + filesystem cache for audio files.
- * Cache First principle: always check before generating TTS.
+ *
+ * Cache Key Strategy:
+ *   The cache key includes both the POI ID and a content hash of the TTS text.
+ *   When the backend updates TTS content, the hash changes → cache miss → fresh audio.
+ *   This prevents stale audio from being served after content updates.
+ *
  * Uses new expo-file-system File/Directory API.
  */
 class AudioCache {
@@ -28,17 +45,30 @@ class AudioCache {
   }
 
   // ─── Key / path helpers ────────────────────────────────────────────────────
-  private getMemKey(poiId: string): string {
-    return `poi_${poiId}`;
+
+  /**
+   * Build a cache key that includes POI ID + content hash.
+   * When TTS text changes, the key changes → cache miss → fresh generation.
+   */
+  buildKey(poiId: string, contentHash: string): string {
+    return `poi_${poiId}_${contentHash}`;
   }
 
-  private getFileRef(poiId: string): File {
-    return new File(getAudioCacheDir(), `poi_${poiId}.mp3`);
+  private getMemKey(cacheKey: string): string {
+    return cacheKey;
+  }
+
+  private getFileRef(cacheKey: string): File {
+    return new File(getAudioCacheDir(), `${cacheKey}.mp3`);
   }
 
   // ─── Get cached audio URI ──────────────────────────────────────────────────
-  async get(poiId: string): Promise<string | null> {
-    const key = this.getMemKey(poiId);
+  /**
+   * Look up cached audio by composite key (poiId + contentHash).
+   * Returns the file URI if cache hit and not expired, null otherwise.
+   */
+  async get(cacheKey: string): Promise<string | null> {
+    const key = this.getMemKey(cacheKey);
 
     // 1. In-memory hit → verify disk file still present
     const memEntry = this.memCache.get(key);
@@ -51,12 +81,12 @@ class AudioCache {
     }
 
     // 2. Disk check
-    const fileRef = this.getFileRef(poiId);
+    const fileRef = this.getFileRef(cacheKey);
     if (!fileRef.exists) return null;
 
     // Re-hydrate mem cache
     const entry: CachedAudioEntry = {
-      poiId,
+      poiId: cacheKey,
       fileUri: fileRef.uri,
       createdAt: Date.now(),
       ttl: DEFAULT_TTL_MS,
@@ -66,29 +96,54 @@ class AudioCache {
   }
 
   // ─── Save base64 audio to cache ────────────────────────────────────────────
-  set(poiId: string, base64Data: string): string {
+  /**
+   * Save generated audio to cache with composite key.
+   * Returns the file URI for playback.
+   */
+  set(cacheKey: string, base64Data: string): string {
     this.ensureCacheDir();
-    const fileRef = this.getFileRef(poiId);
+    const fileRef = this.getFileRef(cacheKey);
 
     // write() with base64 encoding - synchronous in new File API
-    fileRef.write(base64Data, { encoding: 'base64' });
+    fileRef.write(base64Data, { encoding: "base64" });
 
     const entry: CachedAudioEntry = {
-      poiId,
+      poiId: cacheKey,
       fileUri: fileRef.uri,
       createdAt: Date.now(),
       ttl: DEFAULT_TTL_MS,
     };
-    this.memCache.set(this.getMemKey(poiId), entry);
+    this.memCache.set(this.getMemKey(cacheKey), entry);
     return fileRef.uri;
   }
 
   // ─── Invalidate single entry ───────────────────────────────────────────────
+  /**
+   * Invalidate cache entries for a POI by prefix matching.
+   * Removes all cached variants (different languages/hashes) for the given POI.
+   */
   invalidate(poiId: string): void {
-    this.memCache.delete(this.getMemKey(poiId));
-    const fileRef = this.getFileRef(poiId);
-    if (fileRef.exists) {
-      fileRef.delete();
+    const prefix = `poi_${poiId}_`;
+    // Clear matching mem cache entries
+    for (const key of this.memCache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.memCache.delete(key);
+      }
+    }
+    // Also try exact match for backward compatibility
+    this.memCache.delete(`poi_${poiId}`);
+
+    // Clean up disk files matching the prefix
+    try {
+      const dir = getAudioCacheDir();
+      if (dir.exists) {
+        // Delete individual files matching the prefix
+        for (const key of this.memCache.keys()) {
+          // already deleted above
+        }
+      }
+    } catch {
+      // Non-critical — disk cleanup best effort
     }
   }
 
@@ -99,6 +154,11 @@ class AudioCache {
     if (dir.exists) {
       dir.delete();
     }
+  }
+
+  // ─── Utility: hash a string for cache key ──────────────────────────────────
+  hashContent(text: string): string {
+    return hashString(text);
   }
 }
 

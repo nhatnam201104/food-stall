@@ -1,46 +1,94 @@
-import { create } from 'zustand';
-import { audioManager, audioInitialState } from '../services/audio/AudioManager';
-import type { AudioActions, AudioQueueItem, AudioState, TriggerType } from '../types/audio.types';
-import type { PoiDetail } from '../types/tourist.types';
+import { create } from "zustand";
+import {
+  audioManager,
+  audioInitialState,
+} from "../services/audio/AudioManager";
+import { poiService } from "../services/poi.service";
+import type {
+  AudioActions,
+  AudioQueueItem,
+  AudioState,
+  TriggerType,
+} from "../types/audio.types";
+import type { PoiDetail } from "../types/tourist.types";
 
 const QUEUE_CAP = 10;
 
-export type AudioStore = AudioState & AudioActions;
+export type TriggerResult =
+  | { played: true }
+  | { played: false; reason: "cooldown" | "queued" | "already_active" };
+
+export type AudioStore = AudioState &
+  AudioActions & {
+    /** Check if a POI is currently in cooldown */
+    isPoiInCooldown: (poiId: string) => boolean;
+    /** Get cooldown remaining ms for any POI (not just active) */
+    getPoiCooldownRemaining: (poiId: string) => number | null;
+    /** Clear all cooldowns (e.g. when starting a tour) */
+    clearAllCooldowns: () => void;
+  };
 
 export const useAudioStore = create<AudioStore>((set, get) => {
   // ─── Wire AudioManager to Zustand ──────────────────────────────────────────
-  audioManager.init((updater) => set((prev) => updater(prev as AudioState) as AudioStore));
+  audioManager.init((updater) =>
+    set((prev) => updater(prev as AudioState) as AudioStore),
+  );
 
   // ─── Auto-advance queue when audio finishes ────────────────────────────────
-  audioManager.onFinished = () => {
+  audioManager.onFinished = (finishedPoiId: string | null) => {
     const { queue } = get();
+
+    // Increment POI priority when user listens to full TTS
+    if (finishedPoiId) {
+      void poiService.incrementPriority(finishedPoiId).catch(() => {});
+    }
+
     if (queue.length > 0) {
       const [next, ...rest] = queue;
       set({ queue: rest });
       void audioManager.startPlayback(next.poi, next.triggerType);
     } else {
-      set({ activePoi: null, status: 'idle', progress: 0, positionSeconds: 0 });
+      set({ activePoi: null, status: "idle", progress: 0, positionSeconds: 0 });
     }
   };
 
   return {
     // ─── Initial state ──────────────────────────────────────────────────────
     ...audioInitialState(),
+    playedPoiIds: [] as string[],
 
     // ─── triggerPoi: main entry point ──────────────────────────────────────
-    triggerPoi: async (poi: PoiDetail, triggerType: TriggerType): Promise<void> => {
-      const { status, activePoi, queue } = get();
+    triggerPoi: async (
+      poi: PoiDetail,
+      triggerType: TriggerType,
+    ): Promise<void> => {
+      const state = get();
+      const { status, activePoi, queue, playedPoiIds } = state;
 
-      // Cooldown check (skip for manual trigger)
-      if (triggerType !== 'manual' && audioManager.isInCooldown(poi.id)) return;
+      // Proximity: play only once per session (never replay via nearby)
+      if (triggerType === "proximity" && playedPoiIds.includes(poi.id)) {
+        return;
+      }
 
-      const isActive = status === 'playing' || status === 'loading' || status === 'paused';
+      // QR scan: respect cooldown timer
+      if (triggerType === "qr" && audioManager.isInCooldown(poi.id)) {
+        return;
+      }
+
+      const isActive =
+        status === "playing" || status === "loading" || status === "paused";
 
       // Something is already playing → enqueue
       if (isActive && activePoi?.id !== poi.id) {
-        const alreadyQueued = queue.some((q: AudioQueueItem) => q.poi.id === poi.id);
+        const alreadyQueued = queue.some(
+          (q: AudioQueueItem) => q.poi.id === poi.id,
+        );
         if (!alreadyQueued && queue.length < QUEUE_CAP) {
-          const item: AudioQueueItem = { poi, triggerType, addedAt: Date.now() };
+          const item: AudioQueueItem = {
+            poi,
+            triggerType,
+            addedAt: Date.now(),
+          };
           set({ queue: [...queue, item] });
         }
         return;
@@ -48,6 +96,15 @@ export const useAudioStore = create<AudioStore>((set, get) => {
 
       // Nothing playing or same POI → play immediately
       await audioManager.startPlayback(poi, triggerType);
+      get().addPlayedPoiId(poi.id);
+    },
+
+    addPlayedPoiId: (id: string) => {
+      set((state) => ({ playedPoiIds: [...state.playedPoiIds, id] }));
+    },
+
+    clearPlayedPois: () => {
+      set({ playedPoiIds: [] });
     },
 
     // ─── Play / Pause / Stop ────────────────────────────────────────────────
@@ -63,7 +120,7 @@ export const useAudioStore = create<AudioStore>((set, get) => {
       void audioManager.stop();
       set({
         activePoi: null,
-        status: 'idle',
+        status: "idle",
         progress: 0,
         positionSeconds: 0,
         durationSeconds: 0,
@@ -76,7 +133,7 @@ export const useAudioStore = create<AudioStore>((set, get) => {
       await audioManager.stop();
 
       if (queue.length === 0) {
-        set({ activePoi: null, status: 'idle', progress: 0 });
+        set({ activePoi: null, status: "idle", progress: 0 });
         return;
       }
 
@@ -88,7 +145,9 @@ export const useAudioStore = create<AudioStore>((set, get) => {
     // ─── Queue management ───────────────────────────────────────────────────
     removeFromQueue: (poiId: string): void => {
       set((prev) => ({
-        queue: (prev as AudioStore).queue.filter((q: AudioQueueItem) => q.poi.id !== poiId),
+        queue: (prev as AudioStore).queue.filter(
+          (q: AudioQueueItem) => q.poi.id !== poiId,
+        ),
       }));
     },
 
@@ -112,7 +171,26 @@ export const useAudioStore = create<AudioStore>((set, get) => {
 
     // ─── Clear error ────────────────────────────────────────────────────────
     clearError: (): void => {
-      set({ errorMessage: null, status: 'idle' });
+      set({ errorMessage: null, status: "idle" });
+    },
+
+    // ─── Check if a POI is in cooldown ──────────────────────────────────────
+    isPoiInCooldown: (poiId: string): boolean => {
+      return audioManager.isInCooldown(poiId);
+    },
+
+    // ─── Get cooldown remaining ms for any POI ──────────────────────────────
+    getPoiCooldownRemaining: (poiId: string): number | null => {
+      const expiry = audioManager.getCooldownExpiry(poiId);
+      if (!expiry) return null;
+      const remaining = expiry - Date.now();
+      return remaining > 0 ? remaining : null;
+    },
+
+    // ─── Clear all cooldowns (e.g. when starting a tour) ────────────────────
+    clearAllCooldowns: (): void => {
+      audioManager.clearCooldowns();
+      set({ cooldownUntilMs: null });
     },
   };
 });

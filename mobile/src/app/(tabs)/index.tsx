@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,37 +10,59 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { AudioBottomSheet } from '../../components/audio/AudioBottomSheet';
-import { AudioQueue } from '../../components/audio/AudioQueue';
-import { SimulatedMap } from '../../components/map/simulated-map';
-import { PoiResultModal } from '../../components/qr/PoiResultModal';
-import { QRScannerModal } from '../../components/qr/QRScannerModal';
-import { poiService } from '../../services/poi.service';
-import { sessionService } from '../../services/session.service';
-import { useAudioStore } from '../../stores/audioStore';
-import type { PoiDetail, PoiMarker } from '../../types/tourist.types';
-import { getFullImageUrl } from '../../utils/image-url.util';
-
-const DEFAULT_BOUNDS = {
-  minLat: 10.752,
-  maxLat: 10.765,
-  minLng: 106.698,
-  maxLng: 106.7085,
-};
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { AudioBottomSheet } from "../../components/audio/AudioBottomSheet";
+import { AudioQueue } from "../../components/audio/AudioQueue";
+import { SimulatedMap } from "../../components/map/simulated-map";
+import { PoiResultModal } from "../../components/qr/PoiResultModal";
+import { QRScannerModal } from "../../components/qr/QRScannerModal";
+import { TourOverlay } from "../../components/tour/TourOverlay";
+import { ProximityTracker } from "../../services/proximity/ProximityTracker";
+import { poiService } from "../../services/poi.service";
+import { sessionService } from "../../services/session.service";
+import { useAudioStore } from "../../stores/audioStore";
+import { useLocationStore } from "../../stores/locationStore";
+import { useTourStore } from "../../stores/tourStore";
+import { getTourRoute } from "../../services/routing.service";
+import type { RouteCoordinate } from "../../services/routing.service";
+import type { PoiDetail, PoiMarker } from "../../types/tourist.types";
+import { getFullImageUrl } from "../../utils/image-url.util";
 
 const formatCoord = (value: unknown) => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value.toFixed(6);
+  if (typeof value === "number" && Number.isFinite(value))
+    return value.toFixed(6);
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed.toFixed(6) : 'N/A';
+  return Number.isFinite(parsed) ? parsed.toFixed(6) : "N/A";
 };
+
+/** Haversine distance in meters between two lat/lng points */
+function getDistanceMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6_371_000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/** Format distance for display: "5.2m" or "1.3km" */
+function formatDistance(meters: number): string {
+  if (meters < 1000) return `${meters.toFixed(1)}m`;
+  return `${(meters / 1000).toFixed(1)}km`;
+}
 
 export default function HomeScreen() {
   const [pois, setPois] = useState<PoiMarker[]>([]);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   // ── POI detail modal state ─────────────────────────────────────────────
@@ -54,82 +76,363 @@ export default function HomeScreen() {
   const [isQrLoading, setIsQrLoading] = useState(false);
 
   // ── Audio store ─────────────────────────────────────────────────────────
-  const { triggerPoi, queue, status, activePoi, stop, errorMessage, clearError } =
-    useAudioStore();
+  const {
+    triggerPoi,
+    queue,
+    status,
+    activePoi,
+    stop,
+    errorMessage,
+    clearError,
+    playedPoiIds,
+    isPoiInCooldown,
+  } = useAudioStore();
 
-  // ── Cooldown for QR POI (live countdown) ───────────────────────────────
+  // ── Tour store ──────────────────────────────────────────────────────────
+  const activeTour = useTourStore((s) => s.activeTour);
+  const currentStepIndex = useTourStore((s) => s.currentStepIndex);
+  const tourStatus = useTourStore((s) => s.tourStatus);
+  const nextStep = useTourStore((s) => s.nextStep);
+  const endTour = useTourStore((s) => s.endTour);
+  const tourError = useTourStore((s) => s.error);
+  const setTourError = useTourStore((s) => s.setError);
+  const isTourActive = tourStatus !== "idle";
+
+  // ── Track which tour steps have been auto-played via proximity ──────────
+  const autoPlayedSteps = useRef<Set<number>>(new Set());
+
+  // ── Tour focus key: changes when tour starts to trigger map re-focus ───
+  const [tourFocusKey, setTourFocusKey] = useState(0);
+
+  // ── Tour route coordinates (fetched from OSRM when tour starts) ─────────
+  const [tourRouteCoordinates, setTourRouteCoordinates] = useState<
+    RouteCoordinate[]
+  >([]);
+
+  // ── User location for distance display ──────────────────────────────────
+  const userLocation = useLocationStore((s) => s.userLocation);
+
+  // ── Proximity tracker ──────────────────────────────────────────────────
+  const trackerRef = useRef<ProximityTracker | null>(null);
+
+  // Ref-based callback to avoid stale closures
+  const onTriggerRef = useRef<(poiId: string) => void>(() => {});
+
+  // Keep the callback fresh on every render
+  onTriggerRef.current = async (poiId: string) => {
+    // ── Tour mode: only trigger for the CURRENT step POI ────────────
+    if (isTourActive && activeTour) {
+      const currentStep = activeTour.tourPois[currentStepIndex];
+      if (!currentStep || poiId !== currentStep.poi.id) {
+        return;
+      }
+
+      // Mark this step as played
+      if (autoPlayedSteps.current.has(currentStepIndex)) return;
+      autoPlayedSteps.current.add(currentStepIndex);
+
+      try {
+        const res = await poiService.detail(poiId);
+        const detail = res.data.data;
+        if (detail) {
+          void triggerPoi(detail, "proximity");
+        }
+      } catch {
+        setTourError(
+          `Failed to load audio for "${currentStep.poi.name}". Skipping...`,
+        );
+        setTimeout(() => nextStep(), 3000);
+      }
+      return;
+    }
+
+    // ── Normal mode: trigger any POI ────────────────────────────────
+    try {
+      const res = await poiService.detail(poiId);
+      const detail = res.data.data;
+      if (detail) {
+        void triggerPoi(detail, "proximity");
+      }
+    } catch {
+      // Failed to fetch POI detail
+    }
+  };
+
+  // Initialize tracker ONCE — never recreated
+  useEffect(() => {
+    const tracker = new ProximityTracker();
+    trackerRef.current = tracker;
+
+    // Wire up the ref-based callback
+    tracker.onTrigger = (poiId: string) => {
+      void onTriggerRef.current(poiId);
+    };
+
+    return () => {
+      tracker.destroy();
+      trackerRef.current = null;
+    };
+  }, []);
+
+  // ── Tour POIs: when tour active, show only tour POIs on map ─────────────
+  const tourPois = useMemo<PoiMarker[]>(() => {
+    if (!activeTour || tourStatus === "idle") return pois;
+    return activeTour.tourPois.map((tp) => ({
+      id: tp.poi.id,
+      name: tp.poi.name,
+      imageUrl: tp.poi.imageUrl ?? undefined,
+      latitude: Number(tp.poi.latitude),
+      longitude: Number(tp.poi.longitude),
+      radiusMeters: tp.poi.radiusMeters,
+      priority: tp.poi.priority,
+      cooldownSeconds: 0,
+    }));
+  }, [activeTour, tourStatus, pois]);
+
+  // Sync POIs to tracker: tour mode → only current step POI; normal → all POIs
+  // Also reset tracker state when step changes so countdown starts fresh
+  useEffect(() => {
+    if (isTourActive && activeTour) {
+      // Reset tracker for new step
+      trackerRef.current?.resetState();
+
+      // Only track the current tour step POI
+      const currentStep = activeTour.tourPois[currentStepIndex];
+      if (currentStep) {
+        const currentPoi: PoiMarker = {
+          id: currentStep.poi.id,
+          name: currentStep.poi.name,
+          imageUrl: currentStep.poi.imageUrl ?? undefined,
+          latitude: Number(currentStep.poi.latitude),
+          longitude: Number(currentStep.poi.longitude),
+          radiusMeters: currentStep.poi.radiusMeters,
+          priority: currentStep.poi.priority,
+          cooldownSeconds: 0,
+        };
+        trackerRef.current?.setPois([currentPoi]);
+      }
+    } else {
+      trackerRef.current?.setPois(pois);
+    }
+  }, [isTourActive, activeTour, currentStepIndex, pois]);
+
+  // ── Tick every 500ms for live countdown display ─────────────────────────
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Cooldown for QR POI (live countdown, works for ANY POI) ────────────
+  const getPoiCooldownRemaining = useAudioStore(
+    (s) => s.getPoiCooldownRemaining,
+  );
+
   const qrCooldownMs = useMemo(() => {
-    if (!qrPoi || activePoi?.id !== qrPoi.id) return null;
-    return null; // Will be computed live via state
-  }, [qrPoi, activePoi]);
+    if (!qrPoi) return null;
+    return getPoiCooldownRemaining(qrPoi.id);
+  }, [qrPoi, getPoiCooldownRemaining, tick]); // tick forces re-compute every 500ms
 
   // ── Auto-dismiss error toast ────────────────────────────────────────────
   useEffect(() => {
     if (errorMessage) {
-      Alert.alert('Audio Error', errorMessage, [{ text: 'OK', onPress: clearError }]);
+      Alert.alert("Audio Error", errorMessage, [
+        { text: "OK", onPress: clearError },
+      ]);
     }
   }, [errorMessage, clearError]);
 
-  // ── Load POIs ──────────────────────────────────────────────────────────
-  const loadPois = async (targetPage: number, append = false) => {
+  // ── Load ALL active POIs (no geographic bounds) ────────────────────────
+  const loadPois = async () => {
     setLoading(true);
     try {
-      const res = await poiService.inView({ ...DEFAULT_BOUNDS, page: targetPage, limit: 30 });
+      const res = await poiService.listAll(1, 200);
       const incoming = res.data.data || [];
-      const pagination = res.data.pagination;
-      console.log(incoming);
-      setPois((prev) => (append ? [...prev, ...incoming] : incoming));
-      setPage(targetPage);
-      setHasMore(Boolean(pagination && pagination.page < pagination.totalPages));
+      setPois(incoming);
     } catch (err) {
       const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Cannot load POIs';
-      Alert.alert('POI error', msg);
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Cannot load POIs";
+      Alert.alert("POI error", msg);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadPois(1, false);
+    void loadPois();
   }, []);
 
   const summary = useMemo(
-    () => `Loaded ${pois.length} POIs around Vĩnh Khánh food street`,
+    () => `${pois.length} POIs trên bản đồ`,
     [pois.length],
   );
 
-  // ── Session ──────────────────────────────────────────────────────────────
-  const startSession = async () => {
-    try {
-      const res = await sessionService.start({ offlineMode: false, appVersion: 'mobile-mvp' });
-      const id = res.data.data?.id;
-      if (!id) return;
-      setSessionId(id);
-      Alert.alert('Phiên bắt đầu', id);
-    } catch (err) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Cannot start session';
-      Alert.alert('Session error', msg);
-    }
-  };
+  // ── Sort POIs: tour mode → by sequence order; normal mode → by distance ──
+  const sortedPois = useMemo(() => {
+    const listToSort = isTourActive ? tourPois : pois;
 
-  const endSession = async () => {
-    if (!sessionId) return;
-    try {
-      await sessionService.end(sessionId);
-      setSessionId(null);
-      stop();
-      Alert.alert('Phiên kết thúc');
-    } catch (err) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Cannot end session';
-      Alert.alert('Session error', msg);
+    if (isTourActive && activeTour) {
+      // Tour mode: sort by tour sequence order
+      const orderMap = new Map(
+        activeTour.tourPois.map((tp, index) => [tp.poi.id, index]),
+      );
+      return [...listToSort].sort((a, b) => {
+        const orderA = orderMap.get(a.id) ?? 999;
+        const orderB = orderMap.get(b.id) ?? 999;
+        return orderA - orderB;
+      });
     }
-  };
+
+    // Normal mode: sort by distance ASC (nearest first)
+    if (!userLocation) return listToSort;
+    return [...listToSort].sort((a, b) => {
+      const distA = getDistanceMeters(
+        userLocation.latitude,
+        userLocation.longitude,
+        Number(a.latitude),
+        Number(a.longitude),
+      );
+      const distB = getDistanceMeters(
+        userLocation.latitude,
+        userLocation.longitude,
+        Number(b.latitude),
+        Number(b.longitude),
+      );
+      return distA - distB;
+    });
+  }, [isTourActive, activeTour, tourPois, pois, userLocation]);
+
+  // ── Tour POI order map: poiId → sequence number (1-based) ───────────────
+  const tourPoiOrder = useMemo<Record<string, number>>(() => {
+    if (!activeTour || tourStatus === "idle") return {};
+    const order: Record<string, number> = {};
+    activeTour.tourPois.forEach((tp, index) => {
+      order[tp.poi.id] = index + 1;
+    });
+    return order;
+  }, [activeTour, tourStatus]);
+
+  // ── Tour active POI: highlight current step on map ──────────────────────
+  const tourActivePoiId = useMemo(() => {
+    if (!activeTour || tourStatus === "idle") return activePoi?.id;
+    const currentStep = activeTour.tourPois[currentStepIndex];
+    return currentStep?.poi.id ?? activePoi?.id;
+  }, [activeTour, tourStatus, currentStepIndex, activePoi]);
+
+  // ── Tour auto-advance: when audio finishes, go to next step ─────────────
+  useEffect(() => {
+    if (!activeTour || tourStatus !== "active") return;
+    if (status !== "idle") return;
+    if (!autoPlayedSteps.current.has(currentStepIndex)) return;
+
+    // Audio just finished for current step — advance after a short pause
+    const totalSteps = activeTour.tourPois.length;
+    if (currentStepIndex < totalSteps - 1) {
+      const timer = setTimeout(() => {
+        nextStep();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [status, activeTour, tourStatus, currentStepIndex, nextStep]);
+
+  // ── Reset auto-played steps when tour ends ──────────────────────────────
+  useEffect(() => {
+    if (tourStatus === "idle") {
+      autoPlayedSteps.current.clear();
+    }
+  }, [tourStatus]);
+
+  // ── Trigger map re-focus when tour starts + reset cooldowns ─────────────
+  useEffect(() => {
+    if (tourStatus === "active") {
+      setTourFocusKey((k) => k + 1);
+      // Reset all cooldowns and played POIs for fresh tour start
+      useAudioStore.getState().clearAllCooldowns();
+      useAudioStore.getState().clearPlayedPois();
+      // Reset proximity tracker state so it can re-detect tour POIs
+      trackerRef.current?.resetState();
+    }
+  }, [tourStatus]);
+
+  // ── Fetch walking route from OSRM when tour starts ──────────────────────
+  useEffect(() => {
+    if (!activeTour || tourStatus === "idle") {
+      setTourRouteCoordinates([]);
+      return;
+    }
+
+    console.log(
+      "[HomeScreen] Tour active, fetching route. Tour:",
+      activeTour.name,
+      "Status:",
+      tourStatus,
+      "POIs:",
+      activeTour.tourPois.length,
+    );
+
+    let cancelled = false;
+
+    const fetchRoute = async () => {
+      try {
+        const result = await getTourRoute(activeTour);
+        console.log(
+          "[HomeScreen] Route fetched, coordinates:",
+          result.coordinates.length,
+        );
+        if (!cancelled) {
+          setTourRouteCoordinates(result.coordinates);
+        }
+      } catch (err) {
+        // Route fetch failed — map will show POIs without route line
+        console.log("[HomeScreen] Route fetch failed:", err);
+        if (!cancelled) {
+          setTourRouteCoordinates([]);
+        }
+      }
+    };
+
+    void fetchRoute();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTour, tourStatus]);
+
+  // ── Tour error display ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!tourError || !isTourActive) return;
+    const timer = setTimeout(() => {
+      setTourError(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [tourError, isTourActive, setTourError]);
+
+  // ── Session (auto-start on mount, silent) ──────────────────────────────
+  useEffect(() => {
+    const autoStartSession = async () => {
+      try {
+        const res = await sessionService.start({
+          offlineMode: false,
+          appVersion: "mobile-mvp",
+        });
+        const id = res.data.data?.id;
+        if (id) {
+          setSessionId(id);
+        }
+      } catch {
+        // Session auto-start failed silently
+      }
+    };
+    void autoStartSession();
+
+    return () => {
+      // End session on unmount
+      if (sessionId) {
+        sessionService.end(sessionId).catch(() => {});
+      }
+    };
+  }, []);
 
   // ── POI marker click → fetch detail + show modal ───────────────────────
   const openPoiDetail = async (poi: PoiMarker) => {
@@ -143,83 +446,93 @@ export default function HomeScreen() {
     } catch (err2) {
       setDetailPoi(null);
       const msg =
-        (err2 as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Cannot load POI detail';
-      Alert.alert('POI detail error', msg);
+        (err2 as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Cannot load POI detail";
+      Alert.alert("POI detail error", msg);
     } finally {
       setIsDetailLoading(false);
     }
   };
 
-  // ── QR scan → fetch POI + show PoiResultModal ──────────────────────────
+  // ── QR scan → fetch POI + show PoiResultModal + auto-play audio ────────
   const handleQrScanned = async (poi: PoiDetail) => {
     setIsQrOpen(false);
     setQrPoi(poi);
     setIsQrLoading(false);
+
+    // Check cooldown before auto-playing
+    const isInCooldown = useAudioStore.getState().isPoiInCooldown(poi.id);
+    if (isInCooldown) {
+      return;
+    }
+
+    // Auto-play TTS immediately after successful QR scan
+    playAudio(poi, "qr");
   };
 
   // ── Play audio (reusable) ───────────────────────────────────────────────
-  const playAudio = (poi: PoiDetail, triggerType: 'manual' | 'qr' | 'proximity') => {
+  const playAudio = (
+    poi: PoiDetail,
+    triggerType: "manual" | "qr" | "proximity",
+  ) => {
     void triggerPoi(poi, triggerType);
   };
 
   const isCurrentPoiPlaying =
     activePoi?.id === detailPoi?.id &&
-    (status === 'playing' || status === 'loading' || status === 'paused');
+    (status === "playing" || status === "loading" || status === "paused");
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         {/* ── Header row ────────────────────────────────────────────────── */}
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>Map Discovery</Text>
-            <Text style={styles.subtitle}>{summary}</Text>
-          </View>
+        {!isTourActive && (
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.title}>Map Discovery</Text>
+              <Text style={styles.subtitle}>{summary}</Text>
+            </View>
 
-          {/* QR scan button */}
-          <Pressable style={styles.qrButton} onPress={() => setIsQrOpen(true)}>
-            <Text style={styles.qrButtonIcon}>📷</Text>
-            <Text style={styles.qrButtonText}>QR</Text>
-          </Pressable>
-        </View>
+            {/* QR scan button */}
+            <Pressable
+              style={styles.qrButton}
+              onPress={() => setIsQrOpen(true)}
+            >
+              <Text style={styles.qrButtonIcon}>📷</Text>
+              <Text style={styles.qrButtonText}>QR</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* ── Map ──────────────────────────────────────────────────────── */}
         <SimulatedMap
-          pois={pois}
-          bounds={DEFAULT_BOUNDS}
+          pois={tourPois}
+          activePoiId={tourActivePoiId}
           onSelectPoi={(poi) => void openPoiDetail(poi)}
+          focusKey={tourFocusKey}
+          tourRouteCoordinates={isTourActive ? tourRouteCoordinates : undefined}
+          tourPoiOrder={isTourActive ? tourPoiOrder : undefined}
         />
 
-        {/* ── Action buttons ───────────────────────────────────────────── */}
-        <View style={styles.actionsRow}>
-          <Pressable
-            style={[styles.button, styles.primary]}
-            onPress={() => void loadPois(1, false)}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>{loading ? 'Loading...' : 'Refresh View'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.button, styles.secondary, !hasMore && styles.disabled]}
-            onPress={() => void loadPois(page + 1, true)}
-            disabled={loading || !hasMore}
-          >
-            <Text style={styles.buttonText}>Load More</Text>
-          </Pressable>
-        </View>
+        {/* ── Tour Panel (inline between map and POI list) ──────────────── */}
+        {isTourActive && <TourOverlay />}
 
-        <View style={styles.actionsRow}>
-          {!sessionId ? (
-            <Pressable style={[styles.button, styles.primary]} onPress={() => void startSession()}>
-              <Text style={styles.buttonText}>Start Session</Text>
-            </Pressable>
-          ) : (
-            <Pressable style={[styles.button, styles.danger]} onPress={() => void endSession()}>
-              <Text style={styles.buttonText}>End Session</Text>
-            </Pressable>
-          )}
-        </View>
+        {/* ── Action buttons (hidden during tour) ──────────────────────── */}
+        {!isTourActive && (
+          <>
+            <View style={styles.actionsRow}>
+              <Pressable
+                style={[styles.button, styles.primary]}
+                onPress={() => void loadPois()}
+                disabled={loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? "Loading..." : "Refresh POIs"}
+                </Text>
+              </Pressable>
+            </View>
+          </>
+        )}
 
         {/* ── Queue ──────────────────────────────────────────────────── */}
         {queue.length > 0 && (
@@ -228,19 +541,106 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ── POI List ───────────────────────────────────────────────── */}
+        {/* ── POI List (sorted by distance ASC, with countdown) ────────── */}
         <FlatList
-          data={pois}
+          data={sortedPois}
           keyExtractor={(item) => item.id}
           style={styles.list}
-          renderItem={({ item }) => (
-            <Pressable style={styles.poiCard} onPress={() => void openPoiDetail(item)}>
-              <Text style={styles.poiName}>{item.name}</Text>
-              <Text style={styles.poiMeta}>
-                Lat {formatCoord(item.latitude)} • Lng {formatCoord(item.longitude)}
-              </Text>
-            </Pressable>
-          )}
+          extraData={tick}
+          renderItem={({ item }) => {
+            const distanceMeters = userLocation
+              ? getDistanceMeters(
+                  userLocation.latitude,
+                  userLocation.longitude,
+                  Number(item.latitude),
+                  Number(item.longitude),
+                )
+              : -1;
+
+            const distanceText =
+              distanceMeters >= 0
+                ? `📍 ${formatDistance(distanceMeters)}`
+                : `Lat ${formatCoord(item.latitude)} • Lng ${formatCoord(item.longitude)}`;
+
+            // Tour mode: only show countdown for current step POI
+            // Normal mode: show countdown for tracker-selected POI (highest priority, nearest)
+            const selectedPoiId = isTourActive
+              ? tourActivePoiId
+              : trackerRef.current?.getSelectedPoiId();
+            const isSelected = item.id === selectedPoiId;
+            const proximity = isSelected
+              ? trackerRef.current?.getProximityState(item.id)
+              : null;
+            const isPlaying =
+              activePoi?.id === item.id &&
+              (status === "playing" || status === "loading");
+            const isPlayed = playedPoiIds.includes(item.id);
+            const isQueued = queue.some((q) => q.poi.id === item.id);
+            const inCooldown = isPoiInCooldown(item.id);
+
+            // Compute cooldown remaining for display
+            let cooldownRemainingText = "";
+            if (inCooldown) {
+              const remainingMs = getPoiCooldownRemaining(item.id);
+              if (remainingMs && remainingMs > 0) {
+                const secs = Math.ceil(remainingMs / 1000);
+                const m = Math.floor(secs / 60);
+                const s = secs % 60;
+                cooldownRemainingText = m > 0 ? `⏳ ${m}m ${s}s` : `⏳ ${s}s`;
+              }
+            }
+
+            // Compute countdown: only for selected POI
+            let countdownText = "";
+            if (isPlaying) {
+              countdownText = "🔊 Playing";
+            } else if (inCooldown && isPlayed) {
+              countdownText = cooldownRemainingText || "⏳ Cooldown";
+            } else if (isQueued) {
+              countdownText = "📋 Queued";
+            } else if (proximity?.isNearby && proximity.enteredAt) {
+              const elapsedMs = Date.now() - proximity.enteredAt;
+              const remaining = Math.max(0, 3000 - elapsedMs) / 1000;
+              countdownText = `⏳ ${remaining.toFixed(1)}s`;
+            }
+
+            return (
+              <Pressable
+                style={[
+                  styles.poiCard,
+                  isSelected && styles.poiCardNearby,
+                  isPlayed && !inCooldown && styles.poiCardPlayed,
+                  inCooldown && styles.poiCardCooldown,
+                ]}
+                onPress={() => void openPoiDetail(item)}
+              >
+                <View style={styles.poiCardRow}>
+                  <View style={styles.poiCardLeft}>
+                    <Text style={styles.poiName}>
+                      {isPlayed && !inCooldown ? "✅ " : ""}
+                      {inCooldown ? "⏳ " : ""}
+                      {isTourActive && tourPoiOrder[item.id]
+                        ? `${tourPoiOrder[item.id]}. `
+                        : ""}
+                      {item.name}
+                    </Text>
+                    <Text style={styles.poiMeta}>{distanceText}</Text>
+                  </View>
+                  {countdownText ? (
+                    <Text
+                      style={[
+                        styles.poiCountdown,
+                        isPlaying && styles.poiCountdownPlaying,
+                        inCooldown && styles.poiCountdownCooldown,
+                      ]}
+                    >
+                      {countdownText}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            );
+          }}
         />
       </View>
 
@@ -261,11 +661,9 @@ export default function HomeScreen() {
         visible={qrPoi !== null}
         poi={qrPoi}
         loading={isQrLoading}
-        cooldownMsRemaining={
-          qrPoi && activePoi?.id === qrPoi.id ? qrCooldownMs : null
-        }
+        cooldownMsRemaining={qrCooldownMs}
         onClose={() => setQrPoi(null)}
-        onPlayAudio={(poi) => playAudio(poi, 'qr')}
+        onPlayAudio={(poi) => playAudio(poi, "qr")}
       />
 
       {/* ── POI Detail Modal (from map marker click) ─────────────────── */}
@@ -292,56 +690,119 @@ export default function HomeScreen() {
             ) : detailPoi ? (
               <ScrollView contentContainerStyle={styles.detailBody}>
                 {!!detailPoi.imageUrl && (
-                  <Image source={{ uri: getFullImageUrl(detailPoi.imageUrl) ?? undefined }} style={styles.coverImage} />
+                  <Image
+                    source={{
+                      uri: getFullImageUrl(detailPoi.imageUrl) ?? undefined,
+                    }}
+                    style={styles.coverImage}
+                  />
                 )}
-                <Text style={styles.detailName}>{getFullImageUrl(detailPoi.imageUrl)}</Text>
+                <Text style={styles.detailName}>{detailPoi.name}</Text>
+
+                {/* ── Category & Priority badges ─────────────────────── */}
+                <View style={styles.badgeRow}>
+                  {!!detailPoi.category && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{detailPoi.category}</Text>
+                    </View>
+                  )}
+                  <View style={[styles.badge, styles.badgePriority]}>
+                    <Text style={styles.badgeText}>
+                      Priority: {detailPoi.priority}
+                    </Text>
+                  </View>
+                </View>
 
                 {isCurrentPoiPlaying && (
                   <View style={styles.audioStatusBar}>
                     <Text style={styles.audioStatusIcon}>
-                      {status === 'loading' ? '⏳' : status === 'playing' ? '🔊' : '⏸'}
+                      {status === "loading"
+                        ? "⏳"
+                        : status === "playing"
+                          ? "🔊"
+                          : "⏸"}
                     </Text>
                     <Text style={styles.audioStatusText}>
-                      {status === 'loading'
-                        ? 'Đang tải audio...'
-                        : status === 'playing'
-                          ? 'Đang phát thuyết minh'
-                          : 'Tạm dừng'}
+                      {status === "loading"
+                        ? "Đang tải audio..."
+                        : status === "playing"
+                          ? "Đang phát thuyết minh"
+                          : "Tạm dừng"}
                     </Text>
                   </View>
                 )}
 
                 {!!detailPoi.description && (
-                  <Text style={styles.detailDescription}>{detailPoi.description}</Text>
+                  <Text style={styles.detailDescription}>
+                    {detailPoi.description}
+                  </Text>
                 )}
 
                 <View style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>📍 Tọa độ</Text>
-                  <Text style={styles.detailMeta}>Lat {formatCoord(detailPoi.latitude)}</Text>
-                  <Text style={styles.detailMeta}>Lng {formatCoord(detailPoi.longitude)}</Text>
-                  <Text style={styles.detailMeta}>Bán kính {detailPoi.radiusMeters}m</Text>
+                  <Text style={styles.detailSectionTitle}>📍 Location</Text>
+                  <Text style={styles.detailMeta}>
+                    Latitude: {formatCoord(detailPoi.latitude)}
+                  </Text>
+                  <Text style={styles.detailMeta}>
+                    Longitude: {formatCoord(detailPoi.longitude)}
+                  </Text>
+                  <Text style={styles.detailMeta}>
+                    Radius: {detailPoi.radiusMeters}m
+                  </Text>
+                  <Text style={styles.detailMeta}>
+                    Cooldown: {detailPoi.cooldownSeconds}s
+                  </Text>
                 </View>
 
                 {!!detailPoi.merchant && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>🏪 Gian hàng</Text>
-                    <Text style={styles.detailMeta}>{detailPoi.merchant.shopName}</Text>
+                    <Text style={styles.detailSectionTitle}>
+                      🏪 {detailPoi.merchant.shopName}
+                    </Text>
                     {!!detailPoi.merchant.address && (
-                      <Text style={styles.detailMeta}>{detailPoi.merchant.address}</Text>
+                      <Text style={styles.detailMeta}>
+                        📎 {detailPoi.merchant.address}
+                      </Text>
                     )}
                   </View>
                 )}
 
-                {!isCurrentPoiPlaying && (
-                  <Pressable
-                    style={styles.playAudioBtn}
-                    onPress={() => {
-                      if (detailPoi) playAudio(detailPoi, 'manual');
-                    }}
-                  >
-                    <Text style={styles.playAudioBtnText}>▶ Nghe thuyết minh</Text>
-                  </Pressable>
+                {!!detailPoi.poiAudio && detailPoi.poiAudio.length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>
+                      🔊 Audio ({detailPoi.poiAudio.length})
+                    </Text>
+                    {detailPoi.poiAudio.map((audio) => (
+                      <Text key={audio.id} style={styles.detailMeta}>
+                        {audio.languageCode.toUpperCase()} — {audio.status}
+                      </Text>
+                    ))}
+                  </View>
                 )}
+
+                <Pressable
+                  style={[
+                    styles.playAudioBtn,
+                    isCurrentPoiPlaying && styles.playAudioBtnDisabled,
+                  ]}
+                  onPress={() => {
+                    if (detailPoi && !isCurrentPoiPlaying)
+                      playAudio(detailPoi, "manual");
+                  }}
+                  disabled={isCurrentPoiPlaying}
+                >
+                  {isCurrentPoiPlaying ? (
+                    <Text style={styles.playAudioBtnText}>
+                      {status === "loading"
+                        ? "⏳ Đang tải audio..."
+                        : "🔊 Đang phát thuyết minh..."}
+                    </Text>
+                  ) : (
+                    <Text style={styles.playAudioBtnText}>
+                      ▶ Nghe thuyết minh
+                    </Text>
+                  )}
+                </Pressable>
               </ScrollView>
             ) : (
               <Text style={styles.emptyDetail}>Không có dữ liệu.</Text>
@@ -354,101 +815,180 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: "#f8fafc" },
   content: { flex: 1, padding: 14, gap: 10 },
   headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
-  title: { fontSize: 22, fontWeight: '700', color: '#111827' },
-  subtitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  title: { fontSize: 22, fontWeight: "700", color: "#111827" },
+  subtitle: { fontSize: 13, color: "#6b7280", marginTop: 2 },
   qrButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: "#6366f1",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 2,
   },
   qrButtonIcon: { fontSize: 18 },
-  qrButtonText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  actionsRow: { flexDirection: 'row', gap: 10 },
-  button: { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  primary: { backgroundColor: '#4f46e5' },
-  secondary: { backgroundColor: '#0ea5e9' },
-  danger: { backgroundColor: '#ef4444' },
+  qrButtonText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  actionsRow: { flexDirection: "row", gap: 10 },
+  button: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  primary: { backgroundColor: "#4f46e5" },
+  secondary: { backgroundColor: "#0ea5e9" },
+  danger: { backgroundColor: "#ef4444" },
   disabled: { opacity: 0.45 },
-  buttonText: { color: '#fff', fontWeight: '700' },
+  buttonText: { color: "#fff", fontWeight: "700" },
   queueWrapper: { marginTop: -2 },
   list: { marginTop: 2 },
   poiCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 10,
     padding: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: "#e5e7eb",
   },
-  poiName: { fontWeight: '700', color: '#111827' },
-  poiMeta: { fontSize: 12, color: '#6b7280', marginTop: 4 },
-  bottomSheetContainer: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  poiCardNearby: {
+    borderColor: "#4f46e5",
+    backgroundColor: "#f0f0ff",
+    borderWidth: 2,
+  },
+  poiCardPlayed: {
+    borderColor: "#86efac",
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+  },
+  poiCardRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  poiCardLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  poiName: { fontWeight: "700", color: "#111827" },
+  poiMeta: { fontSize: 12, color: "#6b7280", marginTop: 4 },
+  poiCountdown: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#4f46e5",
+    backgroundColor: "#ede9fe",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  poiCountdownPlaying: {
+    backgroundColor: "#d1fae5",
+    color: "#065f46",
+  },
+  poiCardCooldown: {
+    borderColor: "#f59e0b",
+    backgroundColor: "#fffbeb",
+    borderWidth: 1,
+  },
+  poiCountdownCooldown: {
+    backgroundColor: "#fef3c7",
+    color: "#92400e",
+  },
+  bottomSheetContainer: { position: "absolute", bottom: 0, left: 0, right: 0 },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.45)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(15,23,42,0.45)",
+    justifyContent: "flex-end",
   },
   modalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
-    maxHeight: '72%',
+    maxHeight: "72%",
     paddingBottom: 20,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: "#e5e7eb",
   },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  modalClose: { fontSize: 14, fontWeight: '700', color: '#4f46e5' },
-  loadingWrap: { alignItems: 'center', gap: 8, paddingVertical: 20 },
-  loadingText: { color: '#6b7280', fontSize: 13 },
+  modalTitle: { fontSize: 16, fontWeight: "700", color: "#111827" },
+  modalClose: { fontSize: 14, fontWeight: "700", color: "#4f46e5" },
+  loadingWrap: { alignItems: "center", gap: 8, paddingVertical: 20 },
+  loadingText: { color: "#6b7280", fontSize: 13 },
   detailBody: { padding: 14, gap: 10 },
-  coverImage: { width: '100%', height: 170, borderRadius: 12, backgroundColor: '#e5e7eb' },
-  detailName: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  coverImage: {
+    width: "100%",
+    height: 170,
+    borderRadius: 12,
+    backgroundColor: "#e5e7eb",
+  },
+  detailName: { fontSize: 18, fontWeight: "700", color: "#111827" },
   audioStatusBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    backgroundColor: '#ede9fe',
+    backgroundColor: "#ede9fe",
     borderRadius: 10,
     padding: 10,
   },
   audioStatusIcon: { fontSize: 18 },
-  audioStatusText: { fontSize: 13, color: '#4f46e5', fontWeight: '600', flex: 1 },
-  detailDescription: { fontSize: 14, lineHeight: 20, color: '#374151' },
+  audioStatusText: {
+    fontSize: 13,
+    color: "#4f46e5",
+    fontWeight: "600",
+    flex: 1,
+  },
+  detailDescription: { fontSize: 14, lineHeight: 20, color: "#374151" },
   detailSection: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: "#e5e7eb",
     borderRadius: 10,
     padding: 10,
     gap: 4,
   },
-  detailSectionTitle: { fontSize: 13, fontWeight: '700', color: '#111827' },
-  detailMeta: { fontSize: 13, color: '#4b5563' },
+  detailSectionTitle: { fontSize: 13, fontWeight: "700", color: "#111827" },
+  detailMeta: { fontSize: 13, color: "#4b5563" },
   playAudioBtn: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: "#4f46e5",
     borderRadius: 10,
     padding: 12,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 4,
   },
-  playAudioBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  emptyDetail: { padding: 14, color: '#6b7280' },
+  playAudioBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  playAudioBtnDisabled: {
+    backgroundColor: "#a5b4fc",
+    opacity: 0.7,
+  },
+  emptyDetail: { padding: 14, color: "#6b7280" },
+  badgeRow: {
+    flexDirection: "row",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  badge: {
+    backgroundColor: "#ede9fe",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  badgePriority: {
+    backgroundColor: "#fef3c7",
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4f46e5",
+  },
 });

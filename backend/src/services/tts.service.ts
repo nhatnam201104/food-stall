@@ -1,56 +1,391 @@
-import * as googleTTS from 'google-tts-api';
-import { translate } from '@vitalets/google-translate-api';
-import { AppError } from '../errors/app-error';
+import * as googleTTS from "google-tts-api";
+import { translate as googleTranslate } from "@vitalets/google-translate-api";
+import translateClient from "@iamtraction/google-translate";
+import { AppError } from "../errors/app-error";
 
-const PREVIEW_LANGUAGES = ['vi', 'en', 'zh'] as const;
-type PreviewLanguage = typeof PREVIEW_LANGUAGES[number];
+// ─── Supported languages (ISO 639-1 base codes) ──────────────────────────────
+const PREVIEW_LANGUAGES = [
+  "vi",
+  "en",
+  "zh",
+  "fr",
+  "ja",
+  "ko",
+  "de",
+  "es",
+  "pt",
+  "ru",
+  "th",
+  "id",
+] as const;
+type PreviewLanguage = (typeof PREVIEW_LANGUAGES)[number];
 
-const isSupportedPreviewLanguage = (language: string): language is PreviewLanguage =>
+const isSupportedPreviewLanguage = (
+  language: string,
+): language is PreviewLanguage =>
   PREVIEW_LANGUAGES.includes(language as PreviewLanguage);
 
-const mapLanguage = (languageCode: PreviewLanguage): string => {
-  if (languageCode === 'zh') return 'zh-CN';
-  return languageCode;
+/**
+ * Normalize a BCP-47 language tag (e.g. 'ja-JP', 'fr-FR', 'zh-Hans-CN')
+ * to a supported ISO 639-1 base code (e.g. 'ja', 'fr', 'zh').
+ * Falls back to 'vi' if no match found.
+ */
+export const normalizeLanguageCode = (raw: string): string => {
+  if (!raw || typeof raw !== "string") return "vi";
+
+  const lower = raw.trim().toLowerCase();
+
+  // Direct match (e.g. 'vi', 'en', 'ja')
+  if (isSupportedPreviewLanguage(lower)) return lower;
+
+  // Extract base code from BCP-47 (e.g. 'ja-JP' → 'ja', 'zh-Hans' → 'zh')
+  const base = lower.split("-")[0];
+  if (isSupportedPreviewLanguage(base)) return base;
+
+  // Special mappings for common variants
+  const specialMappings: Record<string, string> = {
+    "zh-hans": "zh",
+    "zh-hant": "zh",
+    "zh-cn": "zh",
+    "zh-tw": "zh",
+    "pt-br": "pt",
+    "en-us": "en",
+    "en-gb": "en",
+  };
+  const mapped = specialMappings[lower];
+  if (mapped && isSupportedPreviewLanguage(mapped)) return mapped;
+
+  return "vi"; // Default fallback
 };
 
+/**
+ * Map a base language code to the format expected by google-tts-api.
+ * Some languages need full BCP-47 codes for TTS.
+ */
+const mapLanguageForTTS = (languageCode: PreviewLanguage): string => {
+  const ttsMap: Record<PreviewLanguage, string> = {
+    vi: "vi",
+    en: "en",
+    zh: "zh-CN",
+    fr: "fr",
+    ja: "ja",
+    ko: "ko",
+    de: "de",
+    es: "es",
+    pt: "pt",
+    ru: "ru",
+    th: "th",
+    id: "id",
+  };
+  return ttsMap[languageCode];
+};
+
+// ─── Translation Cache ────────────────────────────────────────────────────────
+interface CacheEntry {
+  translatedText: string;
+  timestamp: number;
+}
+
+const MAX_CACHE_SIZE = 500;
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+class TranslationCache {
+  private cache = new Map<string, CacheEntry>();
+
+  buildKey(text: string, from: string, to: string): string {
+    return `${from}:${to}:${text}`;
+  }
+
+  get(text: string, from: string, to: string): string | null {
+    const key = this.buildKey(text, from, to);
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.translatedText;
+  }
+
+  set(text: string, from: string, to: string, translatedText: string): void {
+    const key = this.buildKey(text, from, to);
+
+    // Evict oldest entries if cache is full
+    if (this.cache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey) this.cache.delete(oldestKey);
+    }
+
+    this.cache.set(key, { translatedText, timestamp: Date.now() });
+  }
+}
+
+const translationCache = new TranslationCache();
+
+// ─── Retry Utility ────────────────────────────────────────────────────────────
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+interface RetryOptions {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY_OPTIONS: RetryOptions = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 8000,
+};
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: Partial<RetryOptions> = {},
+): Promise<T> {
+  const { maxRetries, baseDelayMs, maxDelayMs } = {
+    ...DEFAULT_RETRY_OPTIONS,
+    ...options,
+  };
+
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      // Don't retry on non-rate-limit errors
+      const errorMessage = lastError.message;
+      const isRateLimit =
+        errorMessage.includes("Too Many Requests") ||
+        errorMessage.includes("429") ||
+        errorMessage.includes("rate limit");
+
+      if (!isRateLimit || attempt === maxRetries) {
+        throw lastError;
+      }
+
+      // Exponential backoff with jitter
+      const delay = Math.min(
+        baseDelayMs * Math.pow(2, attempt) + Math.random() * 1000,
+        maxDelayMs,
+      );
+      console.warn(
+        `[TTS RETRY] Attempt ${attempt + 1}/${maxRetries} failed, retrying in ${Math.round(delay)}ms...`,
+        { error: errorMessage.substring(0, 100) },
+      );
+      await sleep(delay);
+    }
+  }
+
+  throw lastError;
+}
+
+// ─── Translation Providers ────────────────────────────────────────────────────
+
+/**
+ * Primary translation using @vitalets/google-translate-api
+ */
+async function translateWithVitalets(
+  text: string,
+  from: string,
+  to: string,
+): Promise<string> {
+  const result = await googleTranslate(text, { from, to });
+  return result.text?.trim() || text;
+}
+
+/**
+ * Fallback translation using @iamtraction/google-translate
+ * Uses a different endpoint, less likely to hit same rate limit.
+ */
+async function translateWithIamTraction(
+  text: string,
+  from: string,
+  to: string,
+): Promise<string> {
+  const result = await translateClient(text, { from, to });
+  return result.text?.trim() || text;
+}
+
 export const ttsService = {
-  async generatePreviewAudio(text: string, previewLanguage: string, sourceLanguage = 'vi'): Promise<Buffer> {
+  /**
+   * Translate text from sourceLanguage to targetLanguage.
+   * Uses cache first, then primary provider with retry, then fallback provider.
+   * Returns the translated text, or throws if all methods fail.
+   */
+  async translateText(
+    text: string,
+    targetLanguage: string,
+    sourceLanguage = "vi",
+  ): Promise<string> {
+    const normalizedText = text.trim();
+    if (!normalizedText) return normalizedText;
+
+    const normalizedTarget = normalizeLanguageCode(targetLanguage);
+    const normalizedSource = normalizeLanguageCode(sourceLanguage);
+
+    if (!isSupportedPreviewLanguage(normalizedTarget)) {
+      return normalizedText;
+    }
+    if (!isSupportedPreviewLanguage(normalizedSource)) {
+      return normalizedText;
+    }
+    if (normalizedSource === normalizedTarget) {
+      return normalizedText;
+    }
+
+    // Check cache first
+    const cached = translationCache.get(
+      normalizedText,
+      normalizedSource,
+      normalizedTarget,
+    );
+    if (cached) {
+      console.log("[TTS CACHE] Hit:", {
+        from: normalizedSource,
+        to: normalizedTarget,
+        textPreview: normalizedText.substring(0, 40),
+      });
+      return cached;
+    }
+
+    console.log("[TTS TRANSLATE] Translating:", {
+      from: normalizedSource,
+      to: normalizedTarget,
+      textPreview: normalizedText.substring(0, 80),
+    });
+
+    // Try primary provider with retry
+    try {
+      const translated = await withRetry(
+        () =>
+          translateWithVitalets(
+            normalizedText,
+            normalizedSource,
+            normalizedTarget,
+          ),
+        { maxRetries: 2 },
+      );
+      console.log("[TTS TRANSLATE] Primary success:", {
+        translatedText: translated.substring(0, 80),
+      });
+      translationCache.set(
+        normalizedText,
+        normalizedSource,
+        normalizedTarget,
+        translated,
+      );
+      return translated;
+    } catch (primaryError) {
+      const primaryMsg =
+        primaryError instanceof Error
+          ? primaryError.message
+          : String(primaryError);
+      console.warn("[TTS TRANSLATE] Primary provider failed:", {
+        error: primaryMsg.substring(0, 120),
+      });
+
+      // Try fallback provider
+      try {
+        const translated = await translateWithIamTraction(
+          normalizedText,
+          normalizedSource,
+          normalizedTarget,
+        );
+        console.log("[TTS TRANSLATE] Fallback success:", {
+          translatedText: translated.substring(0, 80),
+        });
+        translationCache.set(
+          normalizedText,
+          normalizedSource,
+          normalizedTarget,
+          translated,
+        );
+        return translated;
+      } catch (fallbackError) {
+        const fallbackMsg =
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : String(fallbackError);
+        console.error("[TTS TRANSLATE] FAILED: Both providers exhausted:", {
+          primaryError: primaryMsg.substring(0, 80),
+          fallbackError: fallbackMsg.substring(0, 80),
+        });
+        // Return original text as last resort
+        return normalizedText;
+      }
+    }
+  },
+
+  async generatePreviewAudio(
+    text: string,
+    previewLanguage: string,
+    sourceLanguage = "vi",
+  ): Promise<Buffer> {
     const normalizedText = text.trim();
     if (!normalizedText) {
-      throw AppError.badRequest('Text is required for TTS preview');
+      throw AppError.badRequest("Text is required for TTS preview");
     }
 
-    if (!isSupportedPreviewLanguage(previewLanguage)) {
-      throw AppError.badRequest('Unsupported preview language. Allowed values: vi, en, zh');
-    }
+    const targetLanguage = normalizeLanguageCode(previewLanguage);
+    const normalizedSourceLanguage = normalizeLanguageCode(sourceLanguage);
 
-    const targetLanguage = previewLanguage;
-    const normalizedSourceLanguage = isSupportedPreviewLanguage(sourceLanguage) ? sourceLanguage : 'vi';
+    if (!isSupportedPreviewLanguage(targetLanguage)) {
+      throw AppError.badRequest(
+        `Unsupported preview language: ${previewLanguage}. Allowed values: ${PREVIEW_LANGUAGES.join(", ")}`,
+      );
+    }
 
     let spokenText = normalizedText;
+    let translationFailed = false;
 
     if (normalizedSourceLanguage !== targetLanguage) {
-      try {
-        const translated = await translate(normalizedText, {
-          from: normalizedSourceLanguage,
-          to: targetLanguage,
-        });
-        spokenText = translated.text?.trim() || normalizedText;
-      } catch {
-        // graceful fallback to original text if translation provider fails
-        spokenText = normalizedText;
+      console.log("[TTS DEBUG] Need translation:", {
+        source: normalizedSourceLanguage,
+        target: targetLanguage,
+        textPreview: normalizedText.substring(0, 80),
+      });
+
+      const translated = await this.translateText(
+        normalizedText,
+        targetLanguage,
+        normalizedSourceLanguage,
+      );
+
+      // Detect if translation actually failed (returned same text in different language request)
+      if (translated === normalizedText) {
+        translationFailed = true;
+        console.warn(
+          "[TTS WARN] Translation returned original text — likely failed. Will generate TTS in source language.",
+        );
+      } else {
+        spokenText = translated;
       }
     }
 
+    // Use source language for TTS if translation failed, to avoid garbled output
+    const ttsLanguage = translationFailed
+      ? normalizedSourceLanguage
+      : targetLanguage;
+
+    console.log("Generating TTS for text:", {
+      spokenText: spokenText.substring(0, 80),
+      targetLanguage: ttsLanguage,
+      translationFailed,
+    });
+
     const ttsUrl = googleTTS.getAudioUrl(spokenText, {
-      lang: mapLanguage(targetLanguage),
+      lang: mapLanguageForTTS(ttsLanguage as PreviewLanguage),
       slow: false,
-      host: 'https://translate.google.com',
+      host: "https://translate.google.com",
     });
 
     const response = await fetch(ttsUrl);
     if (!response.ok) {
-      throw AppError.badRequest('Unable to generate TTS preview at the moment');
+      throw AppError.badRequest("Unable to generate TTS preview at the moment");
     }
 
     const arrayBuffer = await response.arrayBuffer();

@@ -2,6 +2,7 @@ export interface PoiMarker {
   id: string;
   name: string;
   imageUrl?: string | null;
+  category?: string;
   latitude: number;
   longitude: number;
   radiusMeters: number;
@@ -12,6 +13,10 @@ export interface PoiMarker {
 
 export interface PoiDetail extends PoiMarker {
   description?: string | null;
+  /** Backend-translated content based on requested lang param */
+  translatedContent?: string | null;
+  /** Language code of the translated/returned content (ISO 639-1) */
+  detectedLanguage?: string;
   merchant?: {
     id: string;
     shopName: string;

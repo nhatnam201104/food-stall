@@ -1,11 +1,18 @@
-import L from 'leaflet';
-import { useMemo } from 'react';
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMapEvents } from 'react-leaflet';
-import { VINH_KHANH_MAP } from '../../../constants';
-import type { PointOfInterest } from '../../../types';
-import markerRetina from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import L from "leaflet";
+import { useMemo } from "react";
+import {
+  MapContainer,
+  Marker,
+  Polyline,
+  Popup,
+  TileLayer,
+  useMapEvents,
+} from "react-leaflet";
+import { DEFAULT_MAP_VIEW } from "../../../constants";
+import type { PointOfInterest } from "../../../types";
+import markerRetina from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 const defaultMarkerIcon = L.icon({
   iconRetinaUrl: markerRetina,
@@ -35,17 +42,15 @@ interface PoiMapProps {
   onMarkerClick?: (poi: PointOfInterest) => void;
 }
 
-const PickPositionLayer = ({ onPickPosition }: { onPickPosition?: (latitude: number, longitude: number) => void }) => {
+const PickPositionLayer = ({
+  onPickPosition,
+}: {
+  onPickPosition?: (latitude: number, longitude: number) => void;
+}) => {
   useMapEvents({
     click(event) {
       if (!onPickPosition) return;
       const { lat, lng } = event.latlng;
-      const inBounds = lat >= VINH_KHANH_MAP.bounds.southWest[0]
-        && lat <= VINH_KHANH_MAP.bounds.northEast[0]
-        && lng >= VINH_KHANH_MAP.bounds.southWest[1]
-        && lng <= VINH_KHANH_MAP.bounds.northEast[1];
-
-      if (!inBounds) return;
       onPickPosition(lat, lng);
     },
   });
@@ -53,26 +58,44 @@ const PickPositionLayer = ({ onPickPosition }: { onPickPosition?: (latitude: num
   return null;
 };
 
-const PoiMap = ({ pois = [], markers, routePath, height = 500, selectedPosition, onPickPosition, onMarkerClick }: PoiMapProps) => {
+const PoiMap = ({
+  pois = [],
+  markers,
+  routePath,
+  height = 500,
+  selectedPosition,
+  onPickPosition,
+  onMarkerClick,
+}: PoiMapProps) => {
   const effectiveMarkers = useMemo(
-    () => markers || pois.map((poi, index) => ({
-      id: poi.id,
-      name: poi.name,
-      latitude: Number(poi.latitude),
-      longitude: Number(poi.longitude),
-      approvalStatus: poi.approvalStatus,
-      isActive: poi.isActive,
-      sequenceOrder: index + 1,
-    })),
+    () =>
+      markers ||
+      pois.map((poi, index) => ({
+        id: poi.id,
+        name: poi.name,
+        latitude: Number(poi.latitude),
+        longitude: Number(poi.longitude),
+        approvalStatus: poi.approvalStatus,
+        isActive: poi.isActive,
+        sequenceOrder: index + 1,
+      })),
     [markers, pois],
   );
 
   return (
-    <div style={{ width: '100%', height, borderRadius: 12, overflow: 'hidden', border: '1px solid #e8e8e8' }}>
+    <div
+      style={{
+        width: "100%",
+        height,
+        borderRadius: 12,
+        overflow: "hidden",
+        border: "1px solid #e8e8e8",
+      }}
+    >
       <MapContainer
-        center={VINH_KHANH_MAP.center}
-        zoom={VINH_KHANH_MAP.zoom}
-        style={{ width: '100%', height: '100%' }}
+        center={DEFAULT_MAP_VIEW.center}
+        zoom={DEFAULT_MAP_VIEW.zoom}
+        style={{ width: "100%", height: "100%" }}
       >
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
@@ -81,13 +104,19 @@ const PoiMap = ({ pois = [], markers, routePath, height = 500, selectedPosition,
         <PickPositionLayer onPickPosition={onPickPosition} />
 
         {selectedPosition && (
-          <Marker icon={defaultMarkerIcon} position={[selectedPosition.latitude, selectedPosition.longitude]}>
+          <Marker
+            icon={defaultMarkerIcon}
+            position={[selectedPosition.latitude, selectedPosition.longitude]}
+          >
             <Popup>Selected POI Position</Popup>
           </Marker>
         )}
 
         {routePath && routePath.length >= 2 && (
-          <Polyline positions={routePath} pathOptions={{ color: '#1677ff', weight: 4, opacity: 0.9 }} />
+          <Polyline
+            positions={routePath}
+            pathOptions={{ color: "#1677ff", weight: 4, opacity: 0.9 }}
+          />
         )}
 
         {effectiveMarkers.map((marker) => (
@@ -104,9 +133,19 @@ const PoiMap = ({ pois = [], markers, routePath, height = 500, selectedPosition,
           >
             <Popup>
               <strong>{marker.name}</strong>
-              {marker.sequenceOrder ? <div style={{ marginTop: 6 }}>Order: #{marker.sequenceOrder}</div> : null}
-              {marker.approvalStatus ? <div style={{ marginTop: 6 }}>Status: {marker.approvalStatus}</div> : null}
-              {typeof marker.isActive === 'boolean' ? <div>Active: {marker.isActive ? 'Yes' : 'No'}</div> : null}
+              {marker.sequenceOrder ? (
+                <div style={{ marginTop: 6 }}>
+                  Order: #{marker.sequenceOrder}
+                </div>
+              ) : null}
+              {marker.approvalStatus ? (
+                <div style={{ marginTop: 6 }}>
+                  Status: {marker.approvalStatus}
+                </div>
+              ) : null}
+              {typeof marker.isActive === "boolean" ? (
+                <div>Active: {marker.isActive ? "Yes" : "No"}</div>
+              ) : null}
             </Popup>
           </Marker>
         ))}

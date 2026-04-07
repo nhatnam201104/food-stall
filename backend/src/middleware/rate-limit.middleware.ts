@@ -1,6 +1,6 @@
-import rateLimit from 'express-rate-limit';
-import { sendError } from '../utils/response.util';
-import { config } from '../config';
+import rateLimit from "express-rate-limit";
+import { sendError } from "../utils/response.util";
+import { config } from "../config";
 
 export const globalLimiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
@@ -8,7 +8,7 @@ export const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, res) => {
-    sendError(res, 'Too many requests, please try again later.', 429);
+    sendError(res, "Too many requests, please try again later.", 429);
   },
 });
 
@@ -19,6 +19,20 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: true,
   handler: (_req, res) => {
-    sendError(res, 'Too many authentication attempts, please try again in 15 minutes.', 429);
+    sendError(
+      res,
+      "Too many authentication attempts, please try again in 15 minutes.",
+      429,
+    );
+  },
+});
+
+export const ttsLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 TTS requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    sendError(res, "Too many TTS requests, please try again in a minute.", 429);
   },
 });

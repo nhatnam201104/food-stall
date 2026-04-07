@@ -1,9 +1,13 @@
-import { Prisma } from '@prisma/client';
-import { Request } from 'express';
-import { prisma } from '../../config/database';
-import { POI_APPROVAL_STATUS } from '../../constants/poi.constants';
-import { AppError } from '../../errors/app-error';
-import { buildPaginationMeta, parsePagination } from '../../utils/pagination.util';
+import { Prisma } from "@prisma/client";
+import { Request } from "express";
+import { prisma } from "../../config/database";
+import { POI_APPROVAL_STATUS } from "../../constants/poi.constants";
+import { AppError } from "../../errors/app-error";
+import {
+  buildPaginationMeta,
+  parsePagination,
+} from "../../utils/pagination.util";
+import { normalizeLanguageCode, ttsService } from "../tts.service";
 
 interface LatLng {
   latitude: number;
@@ -19,7 +23,12 @@ const haversineDistanceMeters = (a: LatLng, b: LatLng): number => {
 
   const sinLat = Math.sin(dLat / 2);
   const sinLng = Math.sin(dLng / 2);
-  const x = sinLat * sinLat + Math.cos(toRadians(a.latitude)) * Math.cos(toRadians(b.latitude)) * sinLng * sinLng;
+  const x =
+    sinLat * sinLat +
+    Math.cos(toRadians(a.latitude)) *
+      Math.cos(toRadians(b.latitude)) *
+      sinLng *
+      sinLng;
   const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 
   return earthRadius * c;
@@ -43,13 +52,38 @@ const markerSelect = {
 } satisfies Prisma.PointOfInterestSelect;
 
 export const touristPoiService = {
+  /**
+   * List ALL active POIs (no geographic bounds).
+   * Used by mobile to render all markers on the map at once.
+   */
+  async listAll(req: Request) {
+    const { page, limit, skip } = parsePagination(req);
+
+    const where: Prisma.PointOfInterestWhereInput = {
+      ...basePoiWhere,
+    };
+
+    const [total, pois] = await Promise.all([
+      prisma.pointOfInterest.count({ where }),
+      prisma.pointOfInterest.findMany({
+        where,
+        select: markerSelect,
+        orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return { pois, pagination: buildPaginationMeta(total, page, limit) };
+  },
+
   async inView(req: Request) {
     const { page, limit, skip } = parsePagination(req);
 
-    const minLat = Number(req.query['minLat']);
-    const maxLat = Number(req.query['maxLat']);
-    const minLng = Number(req.query['minLng']);
-    const maxLng = Number(req.query['maxLng']);
+    const minLat = Number(req.query["minLat"]);
+    const maxLat = Number(req.query["maxLat"]);
+    const minLng = Number(req.query["minLng"]);
+    const maxLng = Number(req.query["maxLng"]);
 
     const where: Prisma.PointOfInterestWhereInput = {
       ...basePoiWhere,
@@ -62,10 +96,7 @@ export const touristPoiService = {
       prisma.pointOfInterest.findMany({
         where,
         select: markerSelect,
-        orderBy: [
-          { priority: 'desc' },
-          { updatedAt: 'desc' },
-        ],
+        orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
         skip,
         take: limit,
       }),
@@ -77,12 +108,13 @@ export const touristPoiService = {
   async nearby(req: Request) {
     const { page, limit } = parsePagination(req);
 
-    const lat = Number(req.query['lat']);
-    const lng = Number(req.query['lng']);
-    const radius = Number(req.query['radius']);
+    const lat = Number(req.query["lat"]);
+    const lng = Number(req.query["lng"]);
+    const radius = Number(req.query["radius"]);
 
     const latDelta = radius / 111320;
-    const lngDelta = radius / (111320 * Math.max(Math.cos(toRadians(lat)), 0.1));
+    const lngDelta =
+      radius / (111320 * Math.max(Math.cos(toRadians(lat)), 0.1));
 
     const candidates = await prisma.pointOfInterest.findMany({
       where: {
@@ -91,10 +123,7 @@ export const touristPoiService = {
         longitude: { gte: lng - lngDelta, lte: lng + lngDelta },
       },
       select: markerSelect,
-      orderBy: [
-        { priority: 'desc' },
-        { updatedAt: 'desc' },
-      ],
+      orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
       take: 500,
     });
 
@@ -123,7 +152,24 @@ export const touristPoiService = {
     };
   },
 
-  async getById(id: string) {
+  async incrementPriority(id: string): Promise<void> {
+    const poi = await prisma.pointOfInterest.findFirst({
+      where: { id, ...basePoiWhere },
+      select: { id: true },
+    });
+    if (!poi) throw AppError.notFound("POI not found");
+
+    await prisma.pointOfInterest.update({
+      where: { id },
+      data: { priority: { increment: 1 } },
+    });
+  },
+
+  async getById(id: string, lang?: string) {
+    const targetLang = normalizeLanguageCode(lang ?? "vi");
+
+    // Fetch POI with ALL active audio records (not just take:1)
+    // so we can find the best match for the requested language
     const poi = await prisma.pointOfInterest.findFirst({
       where: { id, ...basePoiWhere },
       include: {
@@ -143,14 +189,58 @@ export const touristPoiService = {
             status: true,
             createdAt: true,
           },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
+          where: { status: "active" },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
 
-    if (!poi) throw AppError.notFound('POI not found');
+    if (!poi) throw AppError.notFound("POI not found");
 
-    return poi;
+    // ─── 3-Tier Language Resolution ────────────────────────────────────────
+    // Tier 1: Find poiAudio matching the requested language exactly
+    const matchedAudio = poi.poiAudio.find(
+      (a) => normalizeLanguageCode(a.languageCode) === targetLang,
+    );
+
+    // Tier 3: Fallback — use the first active audio record (usually vi)
+    const fallbackAudio = poi.poiAudio[0] ?? null;
+
+    // Tier 2: If no exact match, try realtime translation
+    // Priority: ttsContent (full description) > poi.description > poi.name
+    let translatedContent: string | null = null;
+    let detectedLanguage = "vi"; // default source language
+
+    if (!matchedAudio && targetLang !== "vi") {
+      // Use ttsContent from fallback audio record first — it's the full
+      // description text meant for TTS. Fall back to poi.description, then name.
+      const fallbackTts = fallbackAudio?.ttsContent?.trim();
+      const sourceText = fallbackTts || poi.description || poi.name;
+      if (sourceText) {
+        try {
+          translatedContent = await ttsService.translateText(
+            sourceText,
+            targetLang,
+            "vi",
+          );
+          detectedLanguage = targetLang;
+        } catch {
+          // Graceful fallback — no translation available
+          translatedContent = null;
+        }
+      }
+    }
+
+    // Return the best audio record for the client
+    const resolvedAudio = matchedAudio ?? fallbackAudio;
+
+    return {
+      ...poi,
+      // Only include the resolved audio (not all records) to reduce payload
+      poiAudio: resolvedAudio ? [resolvedAudio] : [],
+      // Additional fields for multilingual support
+      translatedContent,
+      detectedLanguage,
+    };
   },
 };

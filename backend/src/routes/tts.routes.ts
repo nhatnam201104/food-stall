@@ -1,9 +1,10 @@
-import { Router } from 'express';
-import { ttsController } from '../controllers/tts.controller';
-import { authenticate } from '../middleware/auth.middleware';
+import { Router } from "express";
+import { ttsController } from "../controllers/tts.controller";
+import { authenticate } from "../middleware/auth.middleware";
+import { ttsLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
 
-router.post('/preview', authenticate, ttsController.preview);
+router.post("/preview", authenticate, ttsLimiter, ttsController.preview);
 
 export default router;

@@ -1,10 +1,16 @@
-import type { PoiDetail } from './tourist.types';
+import type { PoiDetail } from "./tourist.types";
 
 // ─── Trigger Type ────────────────────────────────────────────────────────────
-export type TriggerType = 'proximity' | 'manual' | 'qr';
+export type TriggerType = "proximity" | "manual" | "qr";
 
 // ─── Audio Playback State ─────────────────────────────────────────────────────
-export type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'stopped' | 'error';
+export type AudioStatus =
+  | "idle"
+  | "loading"
+  | "playing"
+  | "paused"
+  | "stopped"
+  | "error";
 
 // ─── Queue Item ───────────────────────────────────────────────────────────────
 export interface AudioQueueItem {
@@ -16,9 +22,9 @@ export interface AudioQueueItem {
 // ─── Cached Audio Entry ───────────────────────────────────────────────────────
 export interface CachedAudioEntry {
   poiId: string;
-  fileUri: string;       // local file:// URI on device
-  createdAt: number;     // timestamp
-  ttl: number;           // time-to-live in ms (default 1 hour)
+  fileUri: string; // local file:// URI on device
+  createdAt: number; // timestamp
+  ttl: number; // time-to-live in ms (default 1 hour)
 }
 
 // ─── Audio State (Zustand) ────────────────────────────────────────────────────
@@ -39,6 +45,8 @@ export interface AudioState {
   errorMessage: string | null;
   /** Cooldown expiry timestamp (ms) for the active POI */
   cooldownUntilMs: number | null;
+  /** IDs of POIs already played (anti-dupe for geofencing) */
+  playedPoiIds: string[];
 }
 
 // ─── Audio Store Actions ──────────────────────────────────────────────────────
@@ -61,4 +69,8 @@ export interface AudioActions {
   playNow: (poiId: string) => Promise<void>;
   /** Reset error state */
   clearError: () => void;
+  /** Add POI ID to played list (anti-dupe) */
+  addPlayedPoiId: (id: string) => void;
+  /** Clear played POIs list (tour reset) */
+  clearPlayedPois: () => void;
 }

@@ -14,6 +14,7 @@
     "seed": "ts-node -r tsconfig-paths/register -r dotenv/config prisma/seed.ts"
   },
   "dependencies": {
+    "@iamtraction/google-translate": "^2.0.1",
     "@prisma/client": "^6.7.0",
     "@vitalets/google-translate-api": "^9.2.1",
     "bcryptjs": "^3.0.2",
