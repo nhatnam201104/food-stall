@@ -32,4 +32,19 @@ export const uploadService = {
     );
     return response.data;
   },
+
+  uploadAudio: async (file: File) => {
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    const response = await axiosInstance.post<ApiResponse<{ url: string; filename: string; size: number }>>(
+      '/upload/audio',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    );
+
+    return response.data;
+  },
 };

@@ -1,4 +1,4 @@
-import { Badge, Button, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Button, Input, Modal, Select, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,8 +13,7 @@ const PoiManagement = () => {
 	const [data, setData] = useState<PointOfInterest[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [search, setSearch] = useState('');
-	const [status, setStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
-	const [activeFilter, setActiveFilter] = useState<'all' | 'true' | 'false'>('all');
+	const [status, setStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
 	const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
 
 	const fetchData = async () => {
@@ -25,7 +24,6 @@ const PoiManagement = () => {
 				limit: pagination.limit,
 				search: search || undefined,
 				approvalStatus: status === 'all' ? undefined : status,
-				isActive: activeFilter === 'all' ? undefined : activeFilter,
 				sortBy: 'createdAt',
 				sortOrder: 'desc',
 			});
@@ -41,7 +39,7 @@ const PoiManagement = () => {
 
 	useEffect(() => {
 		fetchData();
-	}, [pagination.page, pagination.limit, search, status, activeFilter]);
+	}, [pagination.page, pagination.limit, search, status]);
 
 	const onApprove = async (poi: PointOfInterest) => {
 		try {
@@ -85,24 +83,6 @@ const PoiManagement = () => {
 		{ title: 'POI Name', dataIndex: 'name', render: (name: string) => <strong>{name}</strong> },
 		{ title: 'Merchant', key: 'merchant', render: (_, row) => row.merchant?.shopName || '-' },
 		{ title: 'Approval', dataIndex: 'approvalStatus', render: (value: string) => <StatusBadge value={value} /> },
-		{
-			title: 'Review',
-			key: 'reviewNote',
-			render: (_, row) => {
-				if (row.approvalStatus !== 'rejected') {
-					return <Typography.Text type="secondary">-</Typography.Text>;
-				}
-
-				const note = row.reviewNote?.trim() || 'No review note provided';
-				return (
-					<Tooltip title={note}>
-						<Typography.Text type="danger" ellipsis style={{ maxWidth: 220, display: 'inline-block' }}>
-							{note}
-						</Typography.Text>
-					</Tooltip>
-				);
-			},
-		},
 		{ title: 'Active', dataIndex: 'isActive', render: (v: boolean) => <Tag color={v ? 'green' : 'red'}>{v ? 'active' : 'inactive'}</Tag> },
 		{ title: 'Actions', key: 'actions', render: (_, row) => (
 			<Space>
@@ -111,7 +91,7 @@ const PoiManagement = () => {
 				<Button size="small" danger onClick={() => onReject(row)} disabled={row.approvalStatus === 'rejected'}>Reject</Button>
 			</Space>
 		) },
-	], [onApprove, onReject, onOpenDetail]);
+	], []);
 
 	return (
 		<PageContainer title="POI Management" subtitle="Moderate, approve and control POI status">
@@ -128,17 +108,6 @@ const PoiManagement = () => {
 						{ value: 'rejected', label: 'Rejected' },
 					]}
 				/>
-				<Select
-					value={activeFilter}
-					style={{ width: 180 }}
-					onChange={(value) => { setActiveFilter(value); setPagination((prev) => ({ ...prev, page: 1 })); }}
-					options={[
-						{ value: 'all', label: 'All active status' },
-						{ value: 'true', label: 'Active' },
-						{ value: 'false', label: 'Inactive' },
-					]}
-				/>
-				<Badge count={pagination.total} showZero />
 			</Space>
 
 			<TableShell title={`POIs (${pagination.total})`}>

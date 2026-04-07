@@ -4,8 +4,6 @@ import { prisma } from '../../config/database';
 import { POI_APPROVAL_STATUS } from '../../constants/poi.constants';
 import { AppError } from '../../errors/app-error';
 import { buildPaginationMeta, parsePagination } from '../../utils/pagination.util';
-import { ttsService } from '../tts.service';
-import { readPoiAudioBufferByUrl, savePoiAudioBuffer } from '../../utils/poi-audio-file.util';
 
 interface LatLng {
   latitude: number;
@@ -146,6 +144,7 @@ export const touristPoiService = {
             createdAt: true,
           },
           orderBy: { createdAt: 'desc' },
+          take: 1,
         },
       },
     });
@@ -153,67 +152,5 @@ export const touristPoiService = {
     if (!poi) throw AppError.notFound('POI not found');
 
     return poi;
-  },
-
-  async getOrGenerateAudio(id: string, languageCode: string): Promise<Buffer> {
-    const poi = await prisma.pointOfInterest.findFirst({
-      where: { id, ...basePoiWhere },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        poiAudio: {
-          select: {
-            id: true,
-            languageCode: true,
-            ttsContent: true,
-            audioUrl: true,
-            status: true,
-            createdAt: true,
-          },
-          where: { status: 'active' },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
-
-    if (!poi) {
-      throw AppError.notFound('POI not found');
-    }
-
-    const activeAudio = poi.poiAudio;
-    const directAudio = activeAudio.find((item) => item.languageCode === languageCode);
-
-    if (directAudio?.audioUrl) {
-      const buffer = readPoiAudioBufferByUrl(directAudio.audioUrl);
-      if (buffer) return buffer;
-    }
-
-    const canonicalTts =
-      directAudio?.ttsContent?.trim()
-      || activeAudio.find((item) => item.languageCode === 'en')?.ttsContent?.trim()
-      || activeAudio.find((item) => !!item.ttsContent?.trim())?.ttsContent?.trim()
-      || poi.description?.trim()
-      || poi.name.trim();
-
-    if (!canonicalTts) {
-      throw AppError.badRequest('No TTS content available for this POI');
-    }
-
-    const generatedBuffer = await ttsService.generatePreviewAudio(canonicalTts, languageCode, 'vi');
-    const saved = savePoiAudioBuffer(generatedBuffer, poi.id, languageCode);
-
-    await prisma.poiAudio.create({
-      data: {
-        poiId: poi.id,
-        languageCode,
-        ttsContent: canonicalTts,
-        audioUrl: saved.audioUrl,
-        fileSizeBytes: saved.fileSizeBytes,
-        status: 'active',
-      },
-    });
-
-    return generatedBuffer;
   },
 };

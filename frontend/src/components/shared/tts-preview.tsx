@@ -6,30 +6,23 @@ import axiosInstance from '../../configs/axios.config';
 import { POI_LANGUAGE_OPTIONS } from '../../constants';
 import type { PoiLanguageCode } from '../../types';
 
-type PreviewLanguageOption = PoiLanguageCode | 'auto';
-
-const PREVIEW_LANGUAGE_OPTIONS: Array<{ value: PreviewLanguageOption; label: string }> = [
-  { value: 'auto', label: 'Auto detect (mixed language)' },
-  ...POI_LANGUAGE_OPTIONS,
-];
-
 interface TtsPreviewProps {
   text?: string | null;
   sourceLanguage?: PoiLanguageCode;
-  defaultPreviewLanguage?: PreviewLanguageOption;
+  defaultPreviewLanguage?: PoiLanguageCode;
   size?: 'small' | 'middle' | 'large';
 }
 const TtsPreview = ({ text, sourceLanguage = 'vi', defaultPreviewLanguage, size = 'small' }: TtsPreviewProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isServerLoading, setIsServerLoading] = useState(false);
-  const [previewLanguage, setPreviewLanguage] = useState<PreviewLanguageOption>(defaultPreviewLanguage || 'auto');
+  const [previewLanguage, setPreviewLanguage] = useState<PoiLanguageCode>(defaultPreviewLanguage || sourceLanguage || 'vi');
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const normalizedText = useMemo(() => (text || '').trim(), [text]);
 
   useEffect(() => {
-    setPreviewLanguage(defaultPreviewLanguage || 'auto');
-  }, [defaultPreviewLanguage]);
+    setPreviewLanguage(defaultPreviewLanguage || sourceLanguage || 'vi');
+  }, [defaultPreviewLanguage, sourceLanguage]);
 
   useEffect(() => {
     return () => {
@@ -109,12 +102,12 @@ const TtsPreview = ({ text, sourceLanguage = 'vi', defaultPreviewLanguage, size 
   return (
     <Space direction="vertical" size={8} style={{ width: '100%' }}>
       <Typography.Text type="secondary">
-        Preview language (explicit language = force translate before speech, Auto = keep mixed language):
+        Preview language (the system will translate TTS content before generating audio):
       </Typography.Text>
-      <Select<PreviewLanguageOption>
+      <Select<PoiLanguageCode>
         value={previewLanguage}
         onChange={(value) => setPreviewLanguage(value)}
-        options={PREVIEW_LANGUAGE_OPTIONS}
+        options={POI_LANGUAGE_OPTIONS}
         style={{ width: 220 }}
       />
       <Button

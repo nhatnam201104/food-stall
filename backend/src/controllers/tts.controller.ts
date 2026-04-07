@@ -6,7 +6,7 @@ export const ttsController = {
   async preview(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const text = typeof req.body?.text === 'string' ? req.body.text : '';
-      const previewLanguage = typeof req.body?.previewLanguage === 'string' ? req.body.previewLanguage : 'auto';
+      const previewLanguage = typeof req.body?.previewLanguage === 'string' ? req.body.previewLanguage : 'vi';
       const sourceLanguage = typeof req.body?.sourceLanguage === 'string' ? req.body.sourceLanguage : 'vi';
 
       if (!text.trim()) {

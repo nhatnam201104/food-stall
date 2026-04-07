@@ -2,7 +2,6 @@ import type { AudioQueueItem, AudioState, TriggerType } from '../../types/audio.
 import type { PoiDetail } from '../../types/tourist.types';
 import { audioPlayer } from './AudioPlayer';
 import { ttsService } from './TTSService';
-import { detectDeviceLanguage } from '../../utils/language.util';
 
 const QUEUE_CAP = 10;
 const COOLDOWN_MS = 300_000; // 5 minutes
@@ -51,20 +50,12 @@ class AudioManager {
 
   // ─── Internal: resolve audio URI via fallback chain ────────────────────────
   private async resolveAudioUri(poi: PoiDetail): Promise<string> {
-    const deviceLanguage = detectDeviceLanguage();
     const audioRecord = poi.poiAudio?.find((a) => a.status === 'active') ?? poi.poiAudio?.[0];
-
-    // Step 1: server-managed persisted audio endpoint by language
-    try {
-      return await ttsService.downloadPoiAudioByLanguage(poi.id, deviceLanguage);
-    } catch {
-      // fall through
-    }
 
     // Step 1: audio file URL (no translation needed — plays as-is)
     if (audioRecord?.audioUrl) {
       try {
-        return await ttsService.downloadAndCache(poi.id, audioRecord.audioUrl, deviceLanguage);
+        return await ttsService.downloadAndCache(poi.id, audioRecord.audioUrl);
       } catch {
         // Fall through to TTS
       }
@@ -74,11 +65,13 @@ class AudioManager {
     //         Do NOT pass audioRecord.languageCode as override — that was the bug.
     const ttsText = audioRecord?.ttsContent ?? poi.description ?? poi.name;
     if (ttsText) {
-      return await ttsService.generateAudio(poi.id, ttsText, deviceLanguage);
+      // detectDeviceLanguage() is called inside TTSService.generateAudio when no override
+      // Backend receives sourceLanguage from ttsText (vi) + previewLanguage from device → auto-translates
+      return await ttsService.generateAudio(poi.id, ttsText);
     }
 
     // Step 3: Fallback — use POI name as TTS
-    return await ttsService.generateAudio(poi.id, poi.name, deviceLanguage);
+    return await ttsService.generateAudio(poi.id, poi.name);
   }
 
   // ─── Public: start playback for a POI (used by audioStore) ───────────────

@@ -18,8 +18,10 @@ export interface MerchantPoiPayload {
   latitude: number;
   longitude: number;
   isActive?: boolean;
-  audioMode: 'tts';
+  audioMode: 'tts' | 'file';
+  /** Multi-language TTS content: { vi: "...", en: "...", zh: "..." } */
   ttsContent?: string;
+  audioUrl?: string;
 }
 
 export const merchantPoiService = {
@@ -37,9 +39,6 @@ export const merchantPoiService = {
 
   update: (id: string, payload: Partial<MerchantPoiPayload>) =>
     axiosInstance.put<ApiResponse<PointOfInterest>>(`/merchant/pois/${id}`, payload),
-
-  resubmit: (id: string) =>
-    axiosInstance.post<ApiResponse<PointOfInterest>>(`/merchant/pois/${id}/resubmit`),
 
   remove: (id: string) =>
     axiosInstance.delete<ApiResponse<null>>(`/merchant/pois/${id}`),

@@ -88,14 +88,4 @@ export const poiService = {
       },
     };
   },
-
-  audioByLanguage: async (id: string, language: 'vi' | 'en' | 'zh') => {
-    const res = await axiosInstance.get<ArrayBuffer>(`/tourist/pois/${id}/audio`, {
-      params: { language },
-      responseType: 'arraybuffer',
-      timeout: 30_000,
-    });
-
-    return res.data;
-  },
 };

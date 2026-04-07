@@ -35,10 +35,32 @@ const imageFileFilter = (
   }
 };
 
+const allowedAudioMimeTypes = ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/webm'];
+
+const audioFileFilter = (
+  _req: Express.Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback,
+): void => {
+  if (allowedAudioMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new AppError(`Audio type not allowed. Allowed types: ${allowedAudioMimeTypes.join(', ')}`, 400));
+  }
+};
+
 export const upload = multer({
   storage,
   fileFilter: imageFileFilter,
   limits: {
     fileSize: config.upload.maxFileSizeMb * 1024 * 1024,
+  },
+});
+
+export const uploadAudio = multer({
+  storage,
+  fileFilter: audioFileFilter,
+  limits: {
+    fileSize: 20 * 1024 * 1024,
   },
 });

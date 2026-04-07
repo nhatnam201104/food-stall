@@ -22,9 +22,31 @@ export const createMerchantPoiValidation = [
   }),
   body('latitude').notEmpty().withMessage('Latitude is required').isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90').toFloat(),
   body('longitude').notEmpty().withMessage('Longitude is required').isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180').toFloat(),
-  body('audioMode').optional().equals(POI_AUDIO_MODE.tts).withMessage('audioMode must be tts'),
-  body('ttsContent').trim().notEmpty().withMessage('ttsContent is required'),
+  body('audioMode').notEmpty().withMessage('audioMode is required').isIn(Object.values(POI_AUDIO_MODE)).withMessage('audioMode must be tts or file'),
+  body('ttsContent').optional({ nullable: true }).trim().isLength({ max: 10000 }).withMessage('TTS content must not exceed 10000 characters'),
+  body('audioUrl').optional({ nullable: true, checkFalsy: true }).custom((val) => {
+    if (!val) return true;
+    const isFullUrl = /^https?:\/\/.+/.test(val);
+    const isRelativePath = val.startsWith('/');
+    if (!isFullUrl && !isRelativePath) throw new Error('Audio URL must be a valid URL or path');
+    return true;
+  }),
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean').toBoolean(),
+  body().custom((_value, { req }) => {
+    const audioMode = req.body.audioMode;
+    const ttsContent = typeof req.body.ttsContent === 'string' ? req.body.ttsContent.trim() : '';
+    const audioUrl = typeof req.body.audioUrl === 'string' ? req.body.audioUrl.trim() : '';
+
+    if (audioMode === POI_AUDIO_MODE.tts && !ttsContent) {
+      throw new Error('ttsContent is required when audioMode is tts');
+    }
+
+    if (audioMode === POI_AUDIO_MODE.file && !audioUrl) {
+      throw new Error('audioUrl is required when audioMode is file');
+    }
+
+    return true;
+  }),
 ];
 
 export const updateMerchantPoiValidation = [
@@ -40,7 +62,29 @@ export const updateMerchantPoiValidation = [
   }),
   body('latitude').optional().isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90').toFloat(),
   body('longitude').optional().isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180').toFloat(),
-  body('audioMode').optional().equals(POI_AUDIO_MODE.tts).withMessage('audioMode must be tts'),
-  body('ttsContent').trim().notEmpty().withMessage('ttsContent is required'),
+  body('audioMode').notEmpty().withMessage('audioMode is required').isIn(Object.values(POI_AUDIO_MODE)).withMessage('audioMode must be tts or file'),
+  body('ttsContent').optional({ nullable: true }).trim().isLength({ max: 10000 }).withMessage('TTS content must not exceed 10000 characters'),
+  body('audioUrl').optional({ nullable: true, checkFalsy: true }).custom((val) => {
+    if (!val) return true;
+    const isFullUrl = /^https?:\/\/.+/.test(val);
+    const isRelativePath = val.startsWith('/');
+    if (!isFullUrl && !isRelativePath) throw new Error('Audio URL must be a valid URL or path');
+    return true;
+  }),
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean').toBoolean(),
+  body().custom((_value, { req }) => {
+    const audioMode = req.body.audioMode;
+    const ttsContent = typeof req.body.ttsContent === 'string' ? req.body.ttsContent.trim() : '';
+    const audioUrl = typeof req.body.audioUrl === 'string' ? req.body.audioUrl.trim() : '';
+
+    if (audioMode === POI_AUDIO_MODE.tts && !ttsContent) {
+      throw new Error('ttsContent is required when audioMode is tts');
+    }
+
+    if (audioMode === POI_AUDIO_MODE.file && !audioUrl) {
+      throw new Error('audioUrl is required when audioMode is file');
+    }
+
+    return true;
+  }),
 ];

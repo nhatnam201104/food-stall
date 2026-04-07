@@ -16,7 +16,6 @@ export interface AudioQueueItem {
 // ─── Cached Audio Entry ───────────────────────────────────────────────────────
 export interface CachedAudioEntry {
   poiId: string;
-  language: string;
   fileUri: string;       // local file:// URI on device
   createdAt: number;     // timestamp
   ttl: number;           // time-to-live in ms (default 1 hour)

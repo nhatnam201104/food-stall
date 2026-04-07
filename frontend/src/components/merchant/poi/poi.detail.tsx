@@ -14,7 +14,6 @@ interface MerchantPoiDetailProps {
 const MerchantPoiDetail = ({ poiId }: MerchantPoiDetailProps) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [resubmitting, setResubmitting] = useState(false);
   const [poi, setPoi] = useState<PointOfInterest | null>(null);
 
   const fetchDetail = useCallback(async () => {
@@ -33,22 +32,6 @@ const MerchantPoiDetail = ({ poiId }: MerchantPoiDetailProps) => {
   useEffect(() => {
     fetchDetail();
   }, [fetchDetail]);
-
-  const onResubmit = async () => {
-    if (!poi) return;
-
-    try {
-      setResubmitting(true);
-      await merchantPoiService.resubmit(poi.id);
-      toast.success('POI resubmitted for admin review');
-      fetchDetail();
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast.error(axiosErr.response?.data?.message || 'Failed to resubmit POI');
-    } finally {
-      setResubmitting(false);
-    }
-  };
 
   if (loading && !poi) {
     return (
@@ -75,11 +58,7 @@ const MerchantPoiDetail = ({ poiId }: MerchantPoiDetailProps) => {
       <Space style={{ marginBottom: 16 }}>
         <Button onClick={() => navigate(-1)}>Back</Button>
         <Button onClick={fetchDetail} loading={loading}>Refresh</Button>
-        <Button type="primary" onClick={() => navigate(`${ROUTES.merchant.pois}/${poi.id}/edit`)}>Edit POI</Button>
-        {poi.approvalStatus === 'rejected' && (
-          <Button loading={resubmitting} onClick={onResubmit}>Resubmit for review</Button>
-        )}
-        <Button onClick={() => navigate(ROUTES.merchant.pois)}>Go to management</Button>
+        <Button type="primary" onClick={() => navigate(ROUTES.merchant.pois)}>Go to management</Button>
       </Space>
 
       <Row gutter={[16, 16]}>

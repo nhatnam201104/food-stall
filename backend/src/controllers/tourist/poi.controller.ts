@@ -23,15 +23,4 @@ export const touristPoiController = {
       sendSuccess(res, poi, 'POI detail retrieved successfully');
     } catch (err) { next(err); }
   },
-
-  async getAudio(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const poiId = String(req.params['id'] ?? '');
-      const language = String(req.query['language'] ?? 'en');
-      const audioBuffer = await touristPoiService.getOrGenerateAudio(poiId, language);
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Cache-Control', 'no-store');
-      res.send(audioBuffer);
-    } catch (err) { next(err); }
-  },
 };

@@ -16,4 +16,16 @@ export const uploadController = {
     } catch (err) { next(err); }
   },
 
+  uploadAudio(req: Request, res: Response, next: NextFunction): void {
+    try {
+      if (!req.file) {
+        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'No audio file provided' });
+        return;
+      }
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const url = `${baseUrl}/uploads/${req.file.filename}`;
+      sendSuccess(res, { url, filename: req.file.filename, size: req.file.size }, 'Audio uploaded successfully');
+    } catch (err) { next(err); }
+  },
 };
