@@ -58,6 +58,7 @@ const MerchantPoiDetail = ({ poiId }: MerchantPoiDetailProps) => {
       <Space style={{ marginBottom: 16 }}>
         <Button onClick={() => navigate(-1)}>Back</Button>
         <Button onClick={fetchDetail} loading={loading}>Refresh</Button>
+        <Button type="primary" onClick={() => navigate(ROUTES.merchant.poisEdit.replace(':id', poi.id))}>Edit POI</Button>
         <Button type="primary" onClick={() => navigate(ROUTES.merchant.pois)}>Go to management</Button>
       </Space>
 

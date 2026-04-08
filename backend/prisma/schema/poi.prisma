@@ -41,7 +41,7 @@ model PoiAudio {
   id            String   @id @default(uuid())
   poiId         String   @map("poi_id")
   languageCode  String   @default("vi") @map("language_code") @db.VarChar(10)
-  ttsContent    String?  @map("tts_content") @db.Text
+  ttsContent    String?  @map("tts_content") @db.LongText
   audioUrl      String?  @map("audio_url") @db.VarChar(500)
   fileSizeBytes BigInt?  @map("file_size_bytes")
   status        String   @default("active") @db.VarChar(20)

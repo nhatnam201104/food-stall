@@ -13,7 +13,8 @@ const PoiManagement = () => {
 	const [data, setData] = useState<PointOfInterest[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [search, setSearch] = useState('');
-	const [status, setStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+	const [status, setStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+	const [activeFilter, setActiveFilter] = useState<'all' | 'true' | 'false'>('all');
 	const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
 
 	const fetchData = async () => {
@@ -24,6 +25,7 @@ const PoiManagement = () => {
 				limit: pagination.limit,
 				search: search || undefined,
 				approvalStatus: status === 'all' ? undefined : status,
+				isActive: activeFilter === 'all' ? undefined : activeFilter,
 				sortBy: 'createdAt',
 				sortOrder: 'desc',
 			});
@@ -39,7 +41,7 @@ const PoiManagement = () => {
 
 	useEffect(() => {
 		fetchData();
-	}, [pagination.page, pagination.limit, search, status]);
+	}, [pagination.page, pagination.limit, search, status, activeFilter]);
 
 	const onApprove = async (poi: PointOfInterest) => {
 		try {
@@ -106,6 +108,16 @@ const PoiManagement = () => {
 						{ value: 'pending', label: 'Pending' },
 						{ value: 'approved', label: 'Approved' },
 						{ value: 'rejected', label: 'Rejected' },
+					]}
+				/>
+				<Select
+					value={activeFilter}
+					style={{ width: 180 }}
+					onChange={(value) => { setActiveFilter(value); setPagination((prev) => ({ ...prev, page: 1 })); }}
+					options={[
+						{ value: 'all', label: 'All active statuses' },
+						{ value: 'true', label: 'Active' },
+						{ value: 'false', label: 'Inactive' },
 					]}
 				/>
 			</Space>

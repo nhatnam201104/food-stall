@@ -123,6 +123,126 @@ class TranslationCache {
 
 const translationCache = new TranslationCache();
 
+const GOOGLE_TTS_SAFE_CHUNK_SIZE = 180;
+
+const splitLongToken = (token: string, maxLength: number): string[] => {
+  if (token.length <= maxLength) return [token];
+
+  const chunks: string[] = [];
+  for (let i = 0; i < token.length; i += maxLength) {
+    chunks.push(token.slice(i, i + maxLength));
+  }
+  return chunks;
+};
+
+const splitTextForGoogleTts = (
+  text: string,
+  maxLength = GOOGLE_TTS_SAFE_CHUNK_SIZE,
+): string[] => {
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) return [];
+  if (normalized.length <= maxLength) return [normalized];
+
+  const chunked: string[] = [];
+  const paragraphs = normalized
+    .split(/\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const pushByWords = (value: string) => {
+    const words = value.split(" ").filter(Boolean);
+    let current = "";
+
+    for (const word of words) {
+      if (word.length > maxLength) {
+        if (current) {
+          chunked.push(current);
+          current = "";
+        }
+        chunked.push(...splitLongToken(word, maxLength));
+        continue;
+      }
+
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length <= maxLength) {
+        current = candidate;
+      } else {
+        if (current) chunked.push(current);
+        current = word;
+      }
+    }
+
+    if (current) chunked.push(current);
+  };
+
+  for (const paragraph of paragraphs) {
+    if (paragraph.length <= maxLength) {
+      chunked.push(paragraph);
+      continue;
+    }
+
+    const sentences = paragraph
+      .split(/(?<=[.!?。！？])\s+/u)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!sentences.length) {
+      pushByWords(paragraph);
+      continue;
+    }
+
+    let currentSentenceChunk = "";
+    for (const sentence of sentences) {
+      if (sentence.length > maxLength) {
+        if (currentSentenceChunk) {
+          chunked.push(currentSentenceChunk);
+          currentSentenceChunk = "";
+        }
+        pushByWords(sentence);
+        continue;
+      }
+
+      const candidate = currentSentenceChunk
+        ? `${currentSentenceChunk} ${sentence}`
+        : sentence;
+
+      if (candidate.length <= maxLength) {
+        currentSentenceChunk = candidate;
+      } else {
+        if (currentSentenceChunk) chunked.push(currentSentenceChunk);
+        currentSentenceChunk = sentence;
+      }
+    }
+
+    if (currentSentenceChunk) chunked.push(currentSentenceChunk);
+  }
+
+  return chunked.filter(Boolean);
+};
+
+const fetchGoogleTtsChunk = async (
+  text: string,
+  languageCode: PreviewLanguage,
+): Promise<Buffer> => {
+  const ttsUrl = googleTTS.getAudioUrl(text, {
+    lang: mapLanguageForTTS(languageCode),
+    slow: false,
+    host: "https://translate.google.com",
+  });
+
+  const response = await fetch(ttsUrl);
+  if (!response.ok) {
+    throw new Error(`Google TTS request failed with status ${response.status}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+};
+
 // ─── Retry Utility ────────────────────────────────────────────────────────────
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -377,18 +497,38 @@ export const ttsService = {
       translationFailed,
     });
 
-    const ttsUrl = googleTTS.getAudioUrl(spokenText, {
-      lang: mapLanguageForTTS(ttsLanguage as PreviewLanguage),
-      slow: false,
-      host: "https://translate.google.com",
-    });
-
-    const response = await fetch(ttsUrl);
-    if (!response.ok) {
-      throw AppError.badRequest("Unable to generate TTS preview at the moment");
+    const chunks = splitTextForGoogleTts(spokenText);
+    if (!chunks.length) {
+      throw AppError.badRequest("Text is required for TTS preview");
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    console.log("[TTS CHUNK] Split text for preview", {
+      sourceLength: spokenText.length,
+      chunks: chunks.length,
+      chunkSizeLimit: GOOGLE_TTS_SAFE_CHUNK_SIZE,
+    });
+
+    const buffers: Buffer[] = [];
+    for (let index = 0; index < chunks.length; index += 1) {
+      const chunk = chunks[index];
+      try {
+        const chunkBuffer = await withRetry(
+          () =>
+            fetchGoogleTtsChunk(chunk, ttsLanguage as PreviewLanguage),
+          { maxRetries: 2 },
+        );
+        buffers.push(chunkBuffer);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[TTS CHUNK] Failed to generate chunk", {
+          chunkIndex: index,
+          totalChunks: chunks.length,
+          message: message.substring(0, 140),
+        });
+        throw AppError.badRequest("Unable to generate TTS preview at the moment");
+      }
+    }
+
+    return Buffer.concat(buffers);
   },
 };

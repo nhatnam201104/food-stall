@@ -23,7 +23,7 @@ export const createMerchantPoiValidation = [
   body('latitude').notEmpty().withMessage('Latitude is required').isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90').toFloat(),
   body('longitude').notEmpty().withMessage('Longitude is required').isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180').toFloat(),
   body('audioMode').notEmpty().withMessage('audioMode is required').isIn(Object.values(POI_AUDIO_MODE)).withMessage('audioMode must be tts or file'),
-  body('ttsContent').optional({ nullable: true }).trim().isLength({ max: 10000 }).withMessage('TTS content must not exceed 10000 characters'),
+  body('ttsContent').optional({ nullable: true }).trim(),
   body('audioUrl').optional({ nullable: true, checkFalsy: true }).custom((val) => {
     if (!val) return true;
     const isFullUrl = /^https?:\/\/.+/.test(val);
@@ -63,7 +63,7 @@ export const updateMerchantPoiValidation = [
   body('latitude').optional().isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90').toFloat(),
   body('longitude').optional().isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180').toFloat(),
   body('audioMode').notEmpty().withMessage('audioMode is required').isIn(Object.values(POI_AUDIO_MODE)).withMessage('audioMode must be tts or file'),
-  body('ttsContent').optional({ nullable: true }).trim().isLength({ max: 10000 }).withMessage('TTS content must not exceed 10000 characters'),
+  body('ttsContent').optional({ nullable: true }).trim(),
   body('audioUrl').optional({ nullable: true, checkFalsy: true }).custom((val) => {
     if (!val) return true;
     const isFullUrl = /^https?:\/\/.+/.test(val);

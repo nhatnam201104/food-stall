@@ -128,64 +128,6 @@ const getMerchantIdByUserId = async (userId: string): Promise<string> => {
   return merchant.id;
 };
 
-const hasMeaningfulPoiChanges = (
-  currentPoi: {
-    name: string;
-    description: string | null;
-    address: string | null;
-    imageUrl: string | null;
-    latitude: Prisma.Decimal;
-    longitude: Prisma.Decimal;
-    audioMode: string;
-  },
-  payload: UpsertMerchantPoiInput,
-  nextAudio: {
-    ttsContent: string | null;
-    audioUrl: string | null;
-    languageCode: string;
-  },
-  currentAudio: {
-    ttsContent: string | null;
-    audioUrl: string | null;
-    languageCode: string;
-  } | null,
-): boolean => {
-  if (payload.name !== undefined && payload.name !== currentPoi.name)
-    return true;
-  if (
-    payload.description !== undefined &&
-    payload.description !== currentPoi.description
-  )
-    return true;
-  if (payload.address !== undefined && payload.address !== currentPoi.address)
-    return true;
-  if (
-    payload.imageUrl !== undefined &&
-    payload.imageUrl !== currentPoi.imageUrl
-  )
-    return true;
-  if (
-    payload.latitude !== undefined &&
-    Number(currentPoi.latitude) !== payload.latitude
-  )
-    return true;
-  if (
-    payload.longitude !== undefined &&
-    Number(currentPoi.longitude) !== payload.longitude
-  )
-    return true;
-  if (
-    payload.audioMode !== undefined &&
-    payload.audioMode !== currentPoi.audioMode
-  )
-    return true;
-  if ((currentAudio?.ttsContent ?? null) !== nextAudio.ttsContent) return true;
-  if ((currentAudio?.audioUrl ?? null) !== nextAudio.audioUrl) return true;
-  if ((currentAudio?.languageCode ?? "vi") !== nextAudio.languageCode)
-    return true;
-  return false;
-};
-
 export const merchantPoiService = {
   async list(req: Request, userId: string) {
     const merchantId = await getMerchantIdByUserId(userId);
@@ -403,10 +345,6 @@ export const merchantPoiService = {
     };
     const nextAudio = resolveAudioState(nextAudioMode, nextAudioPayload);
 
-    const shouldResetApproval =
-      currentPoi.approvalStatus === POI_APPROVAL_STATUS.approved &&
-      hasMeaningfulPoiChanges(currentPoi, payload, nextAudio, currentAudio);
-
     const poi = await prisma.$transaction(async (tx) => {
       await tx.pointOfInterest.update({
         where: { id: currentPoi.id },
@@ -429,15 +367,6 @@ export const merchantPoiService = {
           ...(payload.audioMode !== undefined && {
             audioMode: payload.audioMode,
           }),
-          ...(shouldResetApproval
-            ? {
-                approvalStatus: POI_APPROVAL_STATUS.pending,
-                reviewNote: null,
-                reviewedAt: null,
-                reviewedBy: null,
-                submittedAt: new Date(),
-              }
-            : {}),
         },
       });
 

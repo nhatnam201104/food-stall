@@ -19,6 +19,7 @@ const TtsPreview = ({ text, sourceLanguage = 'vi', defaultPreviewLanguage, size 
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const normalizedText = useMemo(() => (text || '').trim(), [text]);
+  const textLength = normalizedText.length;
 
   useEffect(() => {
     setPreviewLanguage(defaultPreviewLanguage || sourceLanguage || 'vi');
@@ -103,6 +104,9 @@ const TtsPreview = ({ text, sourceLanguage = 'vi', defaultPreviewLanguage, size 
     <Space direction="vertical" size={8} style={{ width: '100%' }}>
       <Typography.Text type="secondary">
         Preview language (the system will translate TTS content before generating audio):
+      </Typography.Text>
+      <Typography.Text type="secondary">
+        Content length: {textLength.toLocaleString()} characters {textLength > 180 ? '• Long content will be auto-chunked on server' : ''}
       </Typography.Text>
       <Select<PoiLanguageCode>
         value={previewLanguage}
