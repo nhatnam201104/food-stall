@@ -1,0 +1,117 @@
+import { StyleSheet } from 'react-native';
+
+const FRAME = 240;
+const CORNER = 20;
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 54,
+    paddingBottom: 12,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  title: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnText: { color: '#fff', fontSize: 16 },
+  cameraContainer: { flex: 1, position: 'relative' },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  scanFrame: {
+    width: FRAME,
+    height: FRAME,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  corner: {
+    position: 'absolute',
+    width: CORNER,
+    height: CORNER,
+    borderColor: '#6366f1',
+    borderWidth: 3,
+  },
+  cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
+  cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
+  cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
+  cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
+  scanLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#6366f1',
+    opacity: 0.9,
+    borderRadius: 1,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    gap: 8,
+  },
+  loadingText: { color: '#fff', fontSize: 13 },
+  instructionBox: {
+    position: 'absolute',
+    bottom: 60,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+  },
+  instructionText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#fca5a5',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 16,
+  },
+  permIcon: { fontSize: 56 },
+  permTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  permDesc: { color: 'rgba(255,255,255,0.75)', fontSize: 14, textAlign: 'center' },
+  grantBtn: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  grantBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  cameraFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+});

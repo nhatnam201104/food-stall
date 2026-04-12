@@ -13,10 +13,11 @@ import {
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { authStyles, COLORS } from '../../../styles/auth.styles';
 import { registerSchema } from '../../../libs/validation/auth/register.schema';
+import { normalizePhone } from '../../../utils/phone.util';
 import { useAuthStore } from '../../../stores/auth.store';
 import type { AuthStore } from '../../../stores/auth.store';
+import { authStyles, COLORS } from '../login/auth.styles';
 
 const RegisterScreen = () => {
   const [name, setName] = useState('');
@@ -50,7 +51,7 @@ const RegisterScreen = () => {
     const success = await registerTourist({
       fullName: parsed.data.fullName,
       email: parsed.data.email,
-      phone: parsed.data.phone,
+      phone: parsed.data.phone ? (normalizePhone(parsed.data.phone, 'VN') ?? parsed.data.phone) : undefined,
       password: parsed.data.password,
       confirmPassword: parsed.data.confirmPassword,
     });
@@ -67,9 +68,7 @@ const RegisterScreen = () => {
     }
   };
 
-  const navigateToLogin = () => {
-    router.push('/auth/login');
-  };
+  const navigateToLogin = () => router.push('/auth/login');
 
   return (
     <SafeAreaView style={authStyles.container}>

@@ -43,7 +43,7 @@ async function main() {
       fullName: "System Administrator",
       email: "admin@audiotourguide.com",
       passwordHash: adminPwd,
-      phone: "0900000000",
+      phone: '+84900000000',
       isActive: true,
     },
   });
@@ -56,7 +56,7 @@ async function main() {
       fullName: "Nguyễn Văn Thành",
       email: "merchant1@example.com",
       passwordHash: merchantPwd,
-      phone: "0911111111",
+      phone: '+84911111111',
       isActive: true,
     },
   });
@@ -69,7 +69,7 @@ async function main() {
       fullName: "Trần Thị Hoa",
       email: "merchant2@example.com",
       passwordHash: merchantPwd,
-      phone: "0922222222",
+      phone: '+84922222222',
       isActive: true,
     },
   });
@@ -82,7 +82,7 @@ async function main() {
       fullName: "Lê Minh Khoa",
       email: "tourist1@example.com",
       passwordHash: touristPwd,
-      phone: "0933333333",
+      phone: '+84933333333',
       isActive: true,
     },
   });
@@ -95,7 +95,7 @@ async function main() {
       fullName: "Phạm Ngọc Lan",
       email: "tourist2@example.com",
       passwordHash: touristPwd,
-      phone: "0944444444",
+      phone: '+84944444444',
       isActive: true,
     },
   });

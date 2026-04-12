@@ -1,0 +1,44 @@
+import { StyleSheet } from 'react-native';
+
+export const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { padding: 14, gap: 8 },
+  title: { fontSize: 22, fontWeight: '700', color: '#111827' },
+  input: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 42,
+  },
+  searchBtn: {
+    backgroundColor: '#4f46e5',
+    borderRadius: 10,
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  searchBtnText: { color: '#fff', fontWeight: '700' },
+  list: { padding: 14, paddingTop: 0 },
+  card: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  cardDesc: { fontSize: 13, color: '#374151', marginTop: 4 },
+  cardMeta: { fontSize: 12, color: '#6b7280', marginTop: 6 },
+  empty: { color: '#6b7280', textAlign: 'center', marginTop: 18 },
+  moreBtn: {
+    marginTop: 6,
+    marginBottom: 20,
+    backgroundColor: '#0ea5e9',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  moreBtnText: { color: '#fff', fontWeight: '700' },
+});

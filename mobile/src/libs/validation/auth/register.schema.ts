@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidPhone } from '../../../utils/phone.util';
 
 export const registerSchema = z
 	.object({
@@ -7,7 +8,7 @@ export const registerSchema = z
 		phone: z
 			.string()
 			.trim()
-			.regex(/^$|^(\+84|0)?\d{9,10}$/, 'Phone must be a valid Vietnam number.')
+			.refine((val) => !val || isValidPhone(val, 'VN'), 'Invalid phone number. Use local format (e.g. 0912345678) or international format (e.g. +84912345678, +15551234567).')
 			.optional(),
 		password: z.string().min(8, 'Password must be at least 8 characters.'),
 		confirmPassword: z.string().min(1, 'Please confirm your password.'),

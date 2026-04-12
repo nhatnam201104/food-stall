@@ -1,5 +1,5 @@
 import { body } from 'express-validator';
-import { isNormalizedVietnamPhone, normalizeVietnamPhone } from '../../utils/phone.util';
+import { normalizePhone, isNormalizedPhone } from '../../utils/phone.util';
 
 export const registerValidation = [
   body('fullName')
@@ -28,11 +28,11 @@ export const registerValidation = [
 
   body('phone')
     .optional({ nullable: true, checkFalsy: true })
-    .customSanitizer((value) => normalizeVietnamPhone(value) ?? value)
+    .customSanitizer((value) => normalizePhone(value) ?? value)
     .custom((value) => {
       if (value === undefined || value === null || value === '') return true;
-      if (!isNormalizedVietnamPhone(value)) {
-        throw new Error('Phone number must be a valid Vietnam number (auto format +84)');
+      if (!isNormalizedPhone(value)) {
+        throw new Error('Phone number must be a valid international phone number (e.g. +84912345678)');
       }
       return true;
     }),
@@ -84,11 +84,11 @@ export const touristRegisterValidation = [
 
   body('phone')
     .optional({ nullable: true, checkFalsy: true })
-    .customSanitizer((value) => normalizeVietnamPhone(value) ?? value)
+    .customSanitizer((value) => normalizePhone(value) ?? value)
     .custom((value) => {
       if (value === undefined || value === null || value === '') return true;
-      if (!isNormalizedVietnamPhone(value)) {
-        throw new Error('Phone number must be a valid Vietnam number (auto format +84)');
+      if (!isNormalizedPhone(value)) {
+        throw new Error('Phone number must be a valid international phone number (e.g. +84912345678)');
       }
       return true;
     }),
@@ -124,11 +124,11 @@ export const updateProfileValidation = [
 
   body('phone')
     .optional({ nullable: true, checkFalsy: true })
-    .customSanitizer((value) => normalizeVietnamPhone(value) ?? value)
+    .customSanitizer((value) => normalizePhone(value) ?? value)
     .custom((value) => {
       if (value === undefined || value === null || value === '') return true;
-      if (!isNormalizedVietnamPhone(value)) {
-        throw new Error('Phone number must be a valid Vietnam number (auto format +84)');
+      if (!isNormalizedPhone(value)) {
+        throw new Error('Phone number must be a valid international phone number (e.g. +84912345678)');
       }
       return true;
     }),

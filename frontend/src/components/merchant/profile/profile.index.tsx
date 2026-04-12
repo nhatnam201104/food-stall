@@ -5,7 +5,7 @@ import { useAuthStore } from '../../../stores/auth.store';
 import { PageContainer } from '../../shared';
 import { uploadService } from '../../../services/upload.service';
 import { resolveMediaUrl } from '../../../utils/media.util';
-import { normalizeVietnamPhoneInput, toVietnamPhoneE164, toVietnamPhoneInputValue } from '../../../utils/phone.util';
+import { normalizePhone, isValidPhone, formatPhoneForDisplay } from '../../../utils/phone.util';
 
 const MerchantProfile = () => {
   const { message } = App.useApp();
@@ -20,7 +20,7 @@ const MerchantProfile = () => {
       form.setFieldsValue({
         fullName: user.fullName,
         email: user.email,
-        phone: toVietnamPhoneInputValue(user.phone),
+        phone: formatPhoneForDisplay(user.phone, 'VN'),
         shopName: user.merchant?.shopName ?? '',
         address: user.merchant?.address ?? '',
         contactEmail: user.merchant?.contactEmail ?? '',
@@ -56,7 +56,7 @@ const MerchantProfile = () => {
 
     const ok = await updateProfile({
       fullName: values.fullName,
-      phone: toVietnamPhoneE164(values.phone),
+      phone: normalizePhone(values.phone, 'VN') ?? undefined,
       shopName: values.shopName?.trim() || undefined,
       address: values.address?.trim() || undefined,
       contactEmail: values.contactEmail?.trim() || undefined,
@@ -124,18 +124,17 @@ const MerchantProfile = () => {
                 <Form.Item
                   label="Phone"
                   name="phone"
-                  getValueFromEvent={(e) => normalizeVietnamPhoneInput(e?.target?.value)}
                   rules={[
                     {
                       validator: (_, value?: string) => {
                         if (!value) return Promise.resolve();
-                        if (/^\d{9,10}$/.test(value)) return Promise.resolve();
-                        return Promise.reject(new Error('Phone must contain 9-10 valid digits.'));
+                        if (isValidPhone(value, 'VN')) return Promise.resolve();
+                        return Promise.reject(new Error('Phone must be a valid phone number (e.g. 0912345678 or +84912345678).'));
                       },
                     },
                   ]}
                 >
-                  <Input addonBefore="+84" maxLength={10} placeholder="Enter phone digits" />
+                  <Input placeholder="e.g. 0912345678 or +84912345678" />
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>

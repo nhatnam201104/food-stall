@@ -58,7 +58,7 @@ export default function RootLayout() {
 
     let cancelled = false;
 
-    const requestGpsPermissionOnFirstLaunch = async () => {
+    const checkGpsPermissionOnEveryLaunch = async () => {
       try {
         // Always check and sync current permission state to store
         const currentPermission =
@@ -104,7 +104,7 @@ export default function RootLayout() {
       }
     };
 
-    void requestGpsPermissionOnFirstLaunch();
+    void checkGpsPermissionOnEveryLaunch();
 
     return () => {
       cancelled = true;

@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { authService } from '../services/auth.service';
 import type {
+  ChangePasswordPayload,
   ForgotPasswordPayload,
   LoginPayload,
   TouristRegisterPayload,
   TouristSessionUser,
+  UpdateProfilePayload,
 } from '../types/auth.types';
 import { clearAuthSession, getAuthSession, saveAuthSession } from '../utils/auth-storage.util';
 
@@ -19,6 +21,8 @@ export interface AuthStore {
   loginTourist: (payload: LoginPayload) => Promise<boolean>;
   registerTourist: (payload: TouristRegisterPayload) => Promise<boolean>;
   forgotPassword: (payload: ForgotPasswordPayload) => Promise<boolean>;
+  updateProfile: (payload: UpdateProfilePayload) => Promise<boolean>;
+  changePassword: (payload: ChangePasswordPayload) => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -208,6 +212,54 @@ export const useAuthStore = create<AuthStore>((set) => ({
       return true;
     } catch (err) {
       set({ isLoading: false, error: getErrorMessage(err, 'Unable to process forgot password request.') });
+      return false;
+    }
+  },
+
+  updateProfile: async (payload: UpdateProfilePayload): Promise<boolean> => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authService.updateProfile(payload);
+      const updatedUser = res.data.data;
+
+      if (!updatedUser) {
+        set({ isLoading: false, error: 'Failed to update profile. Please try again.' });
+        return false;
+      }
+
+      const touristUser = toTouristUser(updatedUser);
+
+      if (!touristUser) {
+        set({ isLoading: false, error: 'Profile update failed.' });
+        return false;
+      }
+
+      const session = await getAuthSession();
+      if (session) {
+        await saveAuthSession({ token: session.token, user: touristUser });
+      }
+
+      set({
+        user: touristUser,
+        isLoading: false,
+        error: null,
+      });
+
+      return true;
+    } catch (err) {
+      set({ isLoading: false, error: getErrorMessage(err, 'Failed to update profile. Please try again.') });
+      return false;
+    }
+  },
+
+  changePassword: async (payload: ChangePasswordPayload): Promise<boolean> => {
+    set({ isLoading: true, error: null });
+    try {
+      await authService.changePassword(payload);
+      set({ isLoading: false, error: null });
+      return true;
+    } catch (err) {
+      set({ isLoading: false, error: getErrorMessage(err, 'Failed to change password. Please try again.') });
       return false;
     }
   },

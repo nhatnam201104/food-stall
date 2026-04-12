@@ -5,13 +5,13 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
-} from "react-native";
-import { useAudioStore } from "../../stores/audioStore";
-import type { PoiDetail } from "../../types/tourist.types";
-import { getFullImageUrl } from "../../utils/image-url.util";
+} from 'react-native';
+import { useAudioStore } from '../../stores/audioStore';
+import type { PoiDetail } from '../../types/tourist.types';
+import { getFullImageUrl } from '../../utils/image-url.util';
+import { styles } from './poi-result-modal.styles';
 
 interface Props {
   visible: boolean;
@@ -217,113 +217,3 @@ export function PoiResultModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15,23,42,0.5)",
-    justifyContent: "flex-end",
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "80%",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-  },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  closeBtn: { fontSize: 16, color: "#6b7280" },
-  loadingWrap: { alignItems: "center", gap: 12, paddingVertical: 40 },
-  loadingText: { color: "#6b7280", fontSize: 14 },
-  body: { padding: 16, gap: 12 },
-  coverImage: {
-    width: "100%",
-    height: 180,
-    borderRadius: 14,
-    backgroundColor: "#f1f5f9",
-  },
-  poiName: { fontSize: 20, fontWeight: "700", color: "#111827" },
-  badgeRow: {
-    flexDirection: "row",
-    gap: 6,
-    flexWrap: "wrap",
-  },
-  badge: {
-    backgroundColor: "#ede9fe",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgePriority: {
-    backgroundColor: "#fef3c7",
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#4f46e5",
-  },
-  cooldownNotice: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fef3c7",
-    borderRadius: 12,
-    padding: 12,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: "#f59e0b",
-  },
-  cooldownIcon: { fontSize: 22 },
-  cooldownTextWrap: { flex: 1 },
-  cooldownTitle: { fontSize: 13, fontWeight: "700", color: "#92400e" },
-  cooldownDesc: { fontSize: 12, color: "#b45309", marginTop: 2 },
-  playingNotice: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ede9fe",
-    borderRadius: 10,
-    padding: 10,
-    gap: 8,
-  },
-  playingIcon: { fontSize: 18 },
-  playingText: {
-    fontSize: 13,
-    color: "#4f46e5",
-    fontWeight: "600",
-    flex: 1,
-  },
-  description: { fontSize: 14, lineHeight: 22, color: "#374151" },
-  section: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    gap: 4,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 4,
-  },
-  meta: { fontSize: 13, color: "#4b5563" },
-  playBtn: {
-    backgroundColor: "#4f46e5",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  playBtnDisabled: { backgroundColor: "#9ca3af" },
-  playBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  emptyWrap: { alignItems: "center", gap: 12, paddingVertical: 40 },
-  emptyIcon: { fontSize: 40 },
-  emptyText: { color: "#6b7280", fontSize: 14, textAlign: "center" },
-});

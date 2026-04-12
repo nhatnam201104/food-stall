@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Divider, Form, Input, Space, Typography } from 'antd';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../constants';
@@ -9,7 +10,8 @@ import { loginSchema } from '../../../validations';
 
 const LoginForm = () => {
 	const navigate = useNavigate();
-	const { login, isLoading, error, clearError } = useAuthStore();
+	const { login, logout, isLoading, error, clearError } = useAuthStore();
+	const [roleError, setRoleError] = useState<string | null>(null);
 
 	const {
 		control,
@@ -21,8 +23,14 @@ const LoginForm = () => {
 	});
 
 	const onSubmit = async (values: LoginPayload) => {
+		setRoleError(null);
 		const loggedInUser = await login(values);
 		if (!loggedInUser) return;
+		if ((loggedInUser.role as string) !== 'admin' && (loggedInUser.role as string) !== 'merchant') {
+			logout();
+			setRoleError('This platform is for merchants and administrators only.');
+			return;
+		}
 		navigate(
 			loggedInUser.role === 'admin' ? ROUTES.admin.dashboard : ROUTES.merchant.dashboard,
 			{ replace: true },
@@ -41,6 +49,7 @@ const LoginForm = () => {
 			</div>
 
 			{error && <Alert type="error" showIcon message={error} closable onClose={clearError} />}
+		{roleError && <Alert type="error" showIcon message={roleError} closable onClose={() => setRoleError(null)} />}
 
 			<Form layout="vertical" onFinish={handleSubmit(onSubmit)} autoComplete="off">
 				<Form.Item label="Email" validateStatus={errors.email ? 'error' : ''} help={errors.email?.message}>

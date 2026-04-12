@@ -10,7 +10,7 @@ export const GuestGuard = () => {
     return null;
   }
 
-  if (!user) {
+  if (!user || ((user.role as string) !== 'admin' && (user.role as string) !== 'merchant')) {
     return <Outlet />;
   }
 

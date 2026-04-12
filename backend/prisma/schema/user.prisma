@@ -31,6 +31,20 @@ model User {
   tours        Tour[]
   reviewedPois PointOfInterest[] @relation("PoiReviewer")
   userSessions UserSession[]
+  otps         PasswordResetOtp[]
 
   @@map("users")
+}
+
+model PasswordResetOtp {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  otpCode   String   @map("otp_code") @db.VarChar(6)
+  expiresAt DateTime @map("expires_at")
+  isUsed    Boolean  @default(false) @map("is_used")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("password_reset_otps")
 }

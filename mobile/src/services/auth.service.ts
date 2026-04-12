@@ -1,11 +1,13 @@
 import axiosInstance from '../configs/axios.config';
 import type { ApiResponse } from '../types/api.types';
 import type {
+  ChangePasswordPayload,
   ForgotPasswordPayload,
   LoginPayload,
   LoginResponse,
   TouristRegisterPayload,
   TouristSessionUser,
+  UpdateProfilePayload,
 } from '../types/auth.types';
 
 export const authService = {
@@ -23,4 +25,10 @@ export const authService = {
 
   me: () =>
     axiosInstance.get<ApiResponse<TouristSessionUser>>('/auth/me'),
+
+  updateProfile: (payload: UpdateProfilePayload) =>
+    axiosInstance.put<ApiResponse<TouristSessionUser>>('/auth/profile', payload),
+
+  changePassword: (payload: ChangePasswordPayload) =>
+    axiosInstance.put<ApiResponse<null>>('/auth/change-password', payload),
 };

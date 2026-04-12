@@ -45,3 +45,15 @@ export interface StoredAuthSession {
   token: string;
   user: TouristSessionUser;
 }
+
+export interface UpdateProfilePayload {
+  fullName?: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}

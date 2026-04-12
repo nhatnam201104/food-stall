@@ -29,3 +29,30 @@ export const sendPasswordResetEmail = async (
     `,
   });
 };
+
+export const sendOtpEmail = async (
+  toEmail: string,
+  fullName: string,
+  otpCode: string,
+): Promise<void> => {
+  await mailer.sendMail({
+    from: config.mail.from,
+    to: toEmail,
+    subject: 'Mã xác thực đặt lại mật khẩu — Audio Tour Guide',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Xin chào, ${fullName}!</h2>
+        <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản Audio Tour Guide.</p>
+        <p>Mã xác thực của bạn là:</p>
+        <div style="background:#f5f5f5;padding:20px;text-align:center;margin:20px 0;border-radius:8px;">
+          <h1 style="color:#1677ff;font-size:32px;margin:0;letter-spacing:8px;">${otpCode}</h1>
+        </div>
+        <p style="color:#ff4d4f;font-weight:bold;">Mã này có hiệu lực trong <strong>1 phút</strong>.</p>
+        <p style="color:#666;font-size:13px;">
+          Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.<br/>
+          Vui lòng không chia sẻ mã này với bất kỳ ai.
+        </p>
+      </div>
+    `,
+  });
+};

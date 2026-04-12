@@ -13,10 +13,10 @@ import {
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { authStyles, COLORS } from '../../../styles/auth.styles';
 import { loginSchema } from '../../../libs/validation/auth/login.schema';
 import { useAuthStore } from '../../../stores/auth.store';
 import type { AuthStore } from '../../../stores/auth.store';
+import { authStyles, COLORS } from './auth.styles';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -54,13 +54,8 @@ const LoginScreen = () => {
     }
   };
 
-  const navigateToRegister = () => {
-    router.push('/auth/register');
-  };
-
-  const navigateToForgotPassword = () => {
-    router.push('/auth/forgot-password');
-  };
+  const navigateToRegister = () => router.push('/auth/register');
+  const navigateToForgotPassword = () => router.push('/auth/forgot-password');
 
   return (
     <SafeAreaView style={authStyles.container}>
