@@ -10,7 +10,16 @@ export const GuestGuard = () => {
     return null;
   }
 
-  if (!user || ((user.role as string) !== 'admin' && (user.role as string) !== 'merchant')) {
+  if (!user) {
+    return <Outlet />;
+  }
+
+  if ((user.role as string) === 'tourist') {
+    alert('Tourist accounts cannot access the website. Please use the mobile app instead.');
+    return <Navigate to={ROUTES.auth.adminLogin} replace />;
+  }
+
+  if ((user.role as string) !== 'admin' && (user.role as string) !== 'merchant') {
     return <Outlet />;
   }
 

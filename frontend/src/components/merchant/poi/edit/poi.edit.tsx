@@ -70,6 +70,19 @@ const MerchantPoiEdit = ({ poiId }: MerchantPoiEditProps) => {
   };
 
   const beforeAudioUpload: UploadProps['beforeUpload'] = (file) => {
+    const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
+    
+    if (!isMp3) {
+      toast.error('Only MP3 files are allowed');
+      return false;
+    }
+
+    const isLessThan50MB = file.size / 1024 / 1024 < 50;
+    if (!isLessThan50MB) {
+      toast.error('File size must be less than 50MB');
+      return false;
+    }
+
     setAudioFile(file as File);
     return false;
   };
@@ -231,10 +244,10 @@ const MerchantPoiEdit = ({ poiId }: MerchantPoiEditProps) => {
                       <Upload
                         beforeUpload={beforeAudioUpload}
                         maxCount={1}
-                        accept="audio/*"
+                        accept=".mp3,audio/mpeg"
                         fileList={audioFile ? ([{ uid: 'edit-audio', name: audioFile.name, status: 'done' } as UploadFile]) : []}
                       >
-                        <Button>Choose new audio</Button>
+                        <Button>Choose new audio (MP3 only)</Button>
                       </Upload>
                     </Space>
                   </Form.Item>

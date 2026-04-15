@@ -35,6 +35,19 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
   };
 
   const beforeAudioUpload: UploadProps["beforeUpload"] = (file) => {
+    const isMp3 = file.type === "audio/mpeg" || file.name.toLowerCase().endsWith(".mp3");
+    
+    if (!isMp3) {
+      toast.error("Only MP3 files are allowed");
+      return false;
+    }
+
+    const isLessThan50MB = file.size / 1024 / 1024 < 50;
+    if (!isLessThan50MB) {
+      toast.error("File size must be less than 50MB");
+      return false;
+    }
+
     setAudioFile(file as File);
     return false;
   };
@@ -169,7 +182,7 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
                   <Upload
                     beforeUpload={beforeAudioUpload}
                     maxCount={1}
-                    accept="audio/*"
+                    accept=".mp3,audio/mpeg"
                     fileList={
                       audioFile
                         ? [
@@ -182,7 +195,7 @@ const MerchantPoiCreate = ({ onCreated }: MerchantPoiCreateProps) => {
                         : []
                     }
                   >
-                    <Button>Choose audio</Button>
+                    <Button>Choose audio (MP3 only)</Button>
                   </Upload>
                 </Form.Item>
                 <PoiAudioPreview audioMode="file" localAudioFile={audioFile} />
