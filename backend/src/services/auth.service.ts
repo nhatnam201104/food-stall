@@ -246,38 +246,13 @@ export const authService = {
     await prisma.user.update({ where: { id: userId }, data: { passwordHash: newHash } });
   },
 
-  async forgotPassword(email: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
-    // Always return success to avoid user enumeration
-    if (!user || !user.isActive) return;
-
-    const token = randomUUID();
-    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordResetToken: token, passwordResetExpiry: expiry },
-    });
-
-    await sendPasswordResetEmail(user.email, user.fullName, token);
+  async forgotPassword(_email: string) {
+    // Token-based reset removed — use OTP flow (/auth/otp/send)
+    throw AppError.badRequest('Please use the OTP-based password reset flow', 'USE_OTP_FLOW');
   },
 
-  async resetPassword(token: string, newPassword: string) {
-    const user = await prisma.user.findFirst({
-      where: {
-        passwordResetToken: token,
-        passwordResetExpiry: { gt: new Date() },
-      },
-    });
-
-    if (!user) {
-      throw AppError.badRequest('Invalid or expired reset token', 'INVALID_TOKEN');
-    }
-
-    const passwordHash = await hashPassword(newPassword);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash, passwordResetToken: null, passwordResetExpiry: null },
-    });
+  async resetPassword(_token: string, _newPassword: string) {
+    // Token-based reset removed — use OTP flow (/auth/otp/reset)
+    throw AppError.badRequest('Please use the OTP-based password reset flow', 'USE_OTP_FLOW');
   },
 };

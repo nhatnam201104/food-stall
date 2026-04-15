@@ -1,5 +1,4 @@
 import {
-	BarChartOutlined,
 	DashboardOutlined,
 	EnvironmentOutlined,
 	FolderOpenOutlined,
@@ -19,7 +18,6 @@ const getIcon = (key: string) => {
 	if (key === 'profile') return <UserOutlined />;
 	if (key === 'poi') return <EnvironmentOutlined />;
 	if (key === 'history') return <HistoryOutlined />;
-	if (key === 'analytics') return <BarChartOutlined />;
 	if (key === 'group') return <FolderOpenOutlined />;
 	if (key === 'logout') return <LogoutOutlined />;
 	return <DashboardOutlined />;

@@ -52,6 +52,11 @@ const createApp = () => {
   });
 
   // ─── API Routes ────────────────────────────────────────────────────────────
+  // Disable ETag-based caching for all API responses to prevent 304 Not Modified
+  app.use('/api/v1', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   app.use('/api/v1', apiRoutes);
 
   // ─── 404 handler ───────────────────────────────────────────────────────────

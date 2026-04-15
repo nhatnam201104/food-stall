@@ -40,6 +40,31 @@ export interface InteractionHistoryItem {
   userName: string;
 }
 
+export interface SessionHistoryItem {
+  sessionId: string;
+  userId: string;
+  userName: string;
+  tourId: string | null;
+  tourName: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationMinutes: number | null;
+  deviceInfo: string | null;
+  offlineMode: boolean;
+  appVersion: string | null;
+  audioPlayCount: number;
+}
+
+export interface SessionHistory {
+  sessions: SessionHistoryItem[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 export const merchantAnalyticsService = {
   /**
    * Get merchant's overview statistics
@@ -77,6 +102,24 @@ export const merchantAnalyticsService = {
   }) {
     const response = await axiosInstance.get<ApiResponse<InteractionHistory>>(
       `/merchant/analytics/history`,
+      { params },
+    );
+    return response.data;
+  },
+
+  /**
+   * Get user session history for merchant's POIs
+   * @param params - Query params { poiId?, from?, to?, page?, limit? }
+   */
+  async getSessionHistory(params: {
+    poiId?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const response = await axiosInstance.get<ApiResponse<SessionHistory>>(
+      `/merchant/analytics/sessions`,
       { params },
     );
     return response.data;

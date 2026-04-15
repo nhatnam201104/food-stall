@@ -61,28 +61,12 @@ export const touristSessionService = {
         userId,
         tourId: payload.tourId,
         deviceInfo: payload.deviceInfo,
-        offlineMode: payload.offlineMode ?? false,
-        appVersion: payload.appVersion,
       },
     });
   },
 
-  async pushGps(sessionId: string, userId: string, payload: SessionGpsPayload) {
-    const session = await assertSessionOwnership(sessionId, userId);
-
-    if (session.endedAt) {
-      throw AppError.badRequest('Session already ended');
-    }
-
-    await prisma.gpsTrack.create({
-      data: {
-        sessionId,
-        latitude: payload.latitude,
-        longitude: payload.longitude,
-        accuracyMeters: payload.accuracyMeters,
-        speedMps: payload.speedMps,
-      },
-    });
+  async pushGps(_sessionId: string, _userId: string, _payload: SessionGpsPayload) {
+    // GPS tracking has been removed — no-op.
   },
 
   async pushAudioPlay(sessionId: string, userId: string, payload: SessionAudioPlayPayload) {

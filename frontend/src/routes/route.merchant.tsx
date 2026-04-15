@@ -1,7 +1,6 @@
 import { Navigate, Route } from 'react-router-dom';
 import MerchantLayout from '../components/layouts/merchant/merchant.layout';
 import { ROUTES } from '../constants';
-import MerchantAnalyticsPage from '../pages/merchant/analytics.page';
 import MerchantDashboardPage from '../pages/merchant/dashboard.page';
 import MerchantHistoryPage from '../pages/merchant/history.page';
 import MerchantPoisPage from '../pages/merchant/pois.page';
@@ -26,7 +25,6 @@ const merchantRoutes = (
 				<Route path="pois/create" element={<MerchantPoisCreatePage />} />
 				<Route path="pois/map" element={<MerchantPoisMapPage />} />
 				<Route path="history" element={<MerchantHistoryPage />} />
-				<Route path="analytics" element={<MerchantAnalyticsPage />} />
 			</Route>
 		</Route>
 	</Route>

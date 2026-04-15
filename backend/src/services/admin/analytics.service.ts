@@ -234,43 +234,10 @@ export const adminAnalyticsService = {
 
   /**
    * Get heatmap data for GPS tracks
+   * GPS tracking has been removed — returns empty dataset.
    */
-  async getHeatmapData(req: Request) {
-    const { from, to } = req.query as { from?: string; to?: string };
-    const dateFilter = getDateFilter(from, to);
-
-    // Get GPS tracks and aggregate by grid cells (approximate 50m buckets)
-    const tracks = await prisma.gpsTrack.findMany({
-      where: Object.keys(dateFilter).length ? { recordedAt: dateFilter } : {},
-      select: {
-        latitude: true,
-        longitude: true,
-      },
-      take: 10000, // Limit for performance
-    });
-
-    // Aggregate into density grid
-    const gridSize = 0.0005; // Approximately 50m
-    const densityMap = new Map<string, number>();
-
-    for (const track of tracks) {
-      const lat = Number(track.latitude);
-      const lng = Number(track.longitude);
-      const gridLat = Math.floor(lat / gridSize) * gridSize;
-      const gridLng = Math.floor(lng / gridSize) * gridSize;
-      const key = `${gridLat},${gridLng}`;
-
-      densityMap.set(key, (densityMap.get(key) ?? 0) + 1);
-    }
-
-    const heatmapData: HeatmapPoint[] = Array.from(densityMap.entries()).map(
-      ([key, density]) => {
-        const [lat, lng] = key.split(",").map(Number);
-        return { lat, lng, density };
-      },
-    );
-
-    return { heatmap: heatmapData, totalPoints: tracks.length };
+  async getHeatmapData(_req: Request) {
+    return { heatmap: [] as HeatmapPoint[], totalPoints: 0 };
   },
 
   /**
@@ -297,39 +264,8 @@ export const adminAnalyticsService = {
       ...(userId ? { userId } : {}),
     };
 
-    const sessions = await prisma.userSession.findMany({
-      where: whereClause,
-      take: takeLimit,
-      orderBy: { startedAt: "desc" },
-      include: {
-        gpsTracks: {
-          orderBy: { recordedAt: "asc" },
-          select: {
-            latitude: true,
-            longitude: true,
-            recordedAt: true,
-          },
-        },
-        user: {
-          select: { fullName: true },
-        },
-      },
-    });
-
-    const routes: RouteTrack[] = sessions
-      .filter((s) => s.gpsTracks.length > 0)
-      .map((session) => ({
-        sessionId: session.id,
-        userName: session.user?.fullName ?? "Anonymous",
-        startedAt: session.startedAt,
-        tracks: session.gpsTracks.map((t) => ({
-          latitude: Number(t.latitude),
-          longitude: Number(t.longitude),
-          recordedAt: t.recordedAt,
-        })),
-      }));
-
-    return { routes, totalSessions: sessions.length };
+    // GPS tracking has been removed — return empty routes.
+    return { routes: [] as RouteTrack[], totalSessions: 0 };
   },
 
   /**

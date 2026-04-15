@@ -94,6 +94,28 @@ router.get('/history', async (req, res, next) => {
 });
 
 /**
+ * @route   GET /api/merchant/analytics/sessions
+ * @desc    Get user session history that interacted with merchant's POIs
+ * @access  Private (Merchant only)
+ * @query   poiId - Filter by specific POI (optional)
+ * @query   from - Date filter: 'today', '7days', '30days', or ISO date
+ * @query   to - End date filter (ISO date)
+ * @query   page - Page number (default: 1)
+ * @query   limit - Items per page (default: 20, max: 100)
+ */
+router.get('/sessions', async (req, res, next) => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) return res.status(403).json({ success: false, message: 'Access denied' });
+    const merchantId = await getMerchantId(userId);
+    const data = await merchantAnalyticsService.getSessionHistory(merchantId, req.query as any);
+    sendSuccess(res, data, 'Session history retrieved successfully');
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * @route   GET /api/merchant/analytics/pois/:poiId
  * @desc    Get analytics for a specific POI
  * @access  Private (Merchant only)

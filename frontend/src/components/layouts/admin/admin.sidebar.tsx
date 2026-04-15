@@ -18,7 +18,6 @@ const getIcon = (key: string) => {
 	if (key === 'users') return <TeamOutlined />;
 	if (key === 'poi') return <EnvironmentOutlined />;
 	if (key === 'tour') return <BarChartOutlined />;
-	if (key === 'analytics') return <BarChartOutlined />;
 	if (key === 'group') return <FolderOpenOutlined />;
 	if (key === 'logout') return <LogoutOutlined />;
 	return <DashboardOutlined />;

@@ -287,6 +287,92 @@ export const merchantAnalyticsService = {
   /**
    * Get POI-specific analytics
    */
+  /**
+   * Get user session history for merchant's POIs
+   */
+  async getSessionHistory(
+    merchantId: string,
+    query: {
+      poiId?: string;
+      from?: string;
+      to?: string;
+      page?: string;
+      limit?: string;
+    },
+  ) {
+    const { poiId, from, to, page = "1", limit = "20" } = query;
+    const takeLimit = Math.min(parseInt(limit, 10) || 20, 100);
+    const skip = (parseInt(page, 10) - 1) * takeLimit;
+    const dateFilter = getDateFilter(from, to);
+
+    const poiIds = poiId ? [poiId] : await this.getMerchantPoiIds(merchantId);
+
+    if (poiIds.length === 0) {
+      return {
+        sessions: [],
+        pagination: { total: 0, page: 1, limit: takeLimit, totalPages: 0 },
+      };
+    }
+
+    const sessionWhere: Prisma.UserSessionWhereInput = {
+      audioPlayHistory: { some: { poiId: { in: poiIds } } },
+      ...(Object.keys(dateFilter).length ? { startedAt: dateFilter } : {}),
+    };
+
+    const [sessions, total] = await Promise.all([
+      prisma.userSession.findMany({
+        where: sessionWhere,
+        orderBy: { startedAt: "desc" },
+        skip,
+        take: takeLimit,
+        include: {
+          user: { select: { fullName: true } },
+          tour: { select: { name: true } },
+          _count: {
+            select: {
+              audioPlayHistory: {
+                where: { poiId: { in: poiIds } },
+              },
+            },
+          },
+        },
+      }),
+      prisma.userSession.count({ where: sessionWhere }),
+    ]);
+
+    const items = sessions.map((s) => {
+      const durationMs =
+        s.endedAt && s.startedAt
+          ? s.endedAt.getTime() - s.startedAt.getTime()
+          : null;
+      return {
+        sessionId: s.id,
+        userId: s.userId,
+        userName: s.user?.fullName ?? "Anonymous",
+        tourId: s.tourId ?? null,
+        tourName: s.tour?.name ?? null,
+        startedAt: s.startedAt,
+        endedAt: s.endedAt ?? null,
+        durationMinutes:
+          durationMs !== null
+            ? Math.round((durationMs / 60000) * 10) / 10
+            : null,
+        deviceInfo: s.deviceInfo ?? null,
+        audioPlayCount: s._count.audioPlayHistory,
+      };
+    });
+
+    return {
+      sessions: items,
+      pagination: {
+        total,
+        page: parseInt(page, 10),
+        limit: takeLimit,
+        totalPages: Math.ceil(total / takeLimit),
+      },
+    };
+  },
+
   async getPoiAnalytics(
     merchantId: string,
     poiId: string,

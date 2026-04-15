@@ -8,10 +8,18 @@ const generateOtp = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+// In-memory OTP store (replaces password_reset_otps table)
+interface OtpEntry {
+  otpCode: string;
+  expiresAt: Date;
+  isUsed: boolean;
+}
+const otpStore = new Map<string, OtpEntry>(); // key: userId
+
 export const authOtpService = {
   async sendOtp(email: string) {
     const user = await prisma.user.findUnique({ where: { email } });
-    
+
     // Check if email exists in database
     if (!user) {
       throw AppError.badRequest('Email không tồn tại trong hệ thống', 'EMAIL_NOT_FOUND');
@@ -22,25 +30,10 @@ export const authOtpService = {
       throw AppError.badRequest('Tài khoản đã bị khóa', 'ACCOUNT_INACTIVE');
     }
 
-    // Invalidate any existing unused OTPs for this user
-    await prisma.passwordResetOtp.updateMany({
-      where: { userId: user.id, isUsed: false },
-      data: { isUsed: true },
-    });
-
-    // Generate new OTP
+    // Generate new OTP and store in memory (invalidates any previous one)
     const otpCode = generateOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-    // Save OTP to database
-    await prisma.passwordResetOtp.create({
-      data: {
-        userId: user.id,
-        otpCode,
-        expiresAt,
-        isUsed: false,
-      },
-    });
+    otpStore.set(user.id, { otpCode, expiresAt, isUsed: false });
 
     // Send OTP via email with error handling
     try {
@@ -60,17 +53,8 @@ export const authOtpService = {
       throw AppError.badRequest('Invalid email or OTP', 'INVALID_OTP');
     }
 
-    const otpRecord = await prisma.passwordResetOtp.findFirst({
-      where: {
-        userId: user.id,
-        otpCode: otp,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!otpRecord) {
+    const entry = otpStore.get(user.id);
+    if (!entry || entry.isUsed || entry.otpCode !== otp || entry.expiresAt < new Date()) {
       throw AppError.badRequest('Invalid or expired OTP', 'INVALID_OTP');
     }
 
@@ -83,25 +67,13 @@ export const authOtpService = {
       throw AppError.badRequest('Invalid email or OTP', 'INVALID_OTP');
     }
 
-    const otpRecord = await prisma.passwordResetOtp.findFirst({
-      where: {
-        userId: user.id,
-        otpCode: otp,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!otpRecord) {
+    const entry = otpStore.get(user.id);
+    if (!entry || entry.isUsed || entry.otpCode !== otp || entry.expiresAt < new Date()) {
       throw AppError.badRequest('Invalid or expired OTP', 'INVALID_OTP');
     }
 
     // Mark OTP as used
-    await prisma.passwordResetOtp.update({
-      where: { id: otpRecord.id },
-      data: { isUsed: true },
-    });
+    entry.isUsed = true;
 
     // Update password
     const passwordHash = await hashPassword(newPassword);

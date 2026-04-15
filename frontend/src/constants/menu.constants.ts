@@ -4,7 +4,7 @@ export interface SidebarMenuItem {
   key: string;
   label: string;
   path?: string;
-  iconKey: 'dashboard' | 'users' | 'poi' | 'tour' | 'analytics' | 'profile' | 'history' | 'logout' | 'group';
+  iconKey: 'dashboard' | 'users' | 'poi' | 'tour' | 'profile' | 'history' | 'logout' | 'group';
   isLogout?: boolean;
   children?: SidebarMenuItem[];
 }
@@ -22,7 +22,6 @@ export const adminMenuItems: SidebarMenuItem[] = [
       { key: 'admin-tours', label: 'Tour Management', path: ROUTES.admin.tours, iconKey: 'tour' },
     ],
   },
-  { key: 'admin-analytics', label: 'Analytics', path: ROUTES.admin.analytics, iconKey: 'analytics' },
   { key: 'admin-logout', label: 'Logout', iconKey: 'logout', isLogout: true },
 ];
 
@@ -40,6 +39,5 @@ export const merchantMenuItems: SidebarMenuItem[] = [
     ],
   },
   { key: 'merchant-history', label: 'Interaction History', path: ROUTES.merchant.history, iconKey: 'history' },
-  { key: 'merchant-analytics', label: 'Analytics', path: ROUTES.merchant.analytics, iconKey: 'analytics' },
   { key: 'merchant-logout', label: 'Logout', iconKey: 'logout', isLogout: true },
 ];

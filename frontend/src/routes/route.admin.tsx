@@ -1,7 +1,6 @@
 import { Navigate, Route } from 'react-router-dom';
 import AdminLayout from '../components/layouts/admin/admin.layout';
 import { ROUTES } from '../constants';
-import AdminAnalyticsPage from '../pages/admin/analytics.page';
 import AdminDashboardPage from '../pages/admin/dashboard.page';
 import AdminPoisPage from '../pages/admin/pois.page';
 import AdminPoisMapPage from '../pages/admin/pois-map.page';
@@ -26,7 +25,6 @@ const adminRoutes = (
 				<Route path="tours" element={<AdminToursPage />} />
 				<Route path="tours/create" element={<AdminToursCreatePage />} />
 				<Route path="tours/:id/edit" element={<AdminToursEditPage />} />
-				<Route path="analytics" element={<AdminAnalyticsPage />} />
 			</Route>
 		</Route>
 	</Route>

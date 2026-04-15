@@ -20,8 +20,6 @@ model User {
   avatarUrl            String?   @map("avatar_url") @db.VarChar(500)
   isActive             Boolean   @default(true) @map("is_active")
   isDeleted            Boolean   @default(false) @map("is_deleted")
-  passwordResetToken   String?   @map("password_reset_token") @db.VarChar(255)
-  passwordResetExpiry  DateTime? @map("password_reset_expiry")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
   deletedAt            DateTime? @map("deleted_at")
@@ -31,20 +29,6 @@ model User {
   tours        Tour[]
   reviewedPois PointOfInterest[] @relation("PoiReviewer")
   userSessions UserSession[]
-  otps         PasswordResetOtp[]
 
   @@map("users")
-}
-
-model PasswordResetOtp {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  otpCode   String   @map("otp_code") @db.VarChar(6)
-  expiresAt DateTime @map("expires_at")
-  isUsed    Boolean  @default(false) @map("is_used")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@map("password_reset_otps")
 }
