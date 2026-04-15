@@ -18,6 +18,7 @@ import { SimulatedMap } from "../../components/map/simulated-map";
 import { PoiResultModal } from "../../components/qr/PoiResultModal";
 import { QRScannerModal } from "../../components/qr/QRScannerModal";
 import { TourOverlay } from "../../components/tour/TourOverlay";
+import { Platform } from "react-native";
 import { ProximityTracker } from "../../services/proximity/ProximityTracker";
 import { poiService } from "../../services/poi.service";
 import { sessionService } from "../../services/session.service";
@@ -249,6 +250,7 @@ export default function HomeScreen() {
       const res = await poiService.listAll(1, 200);
       const incoming = res.data.data || [];
       setPois(incoming);
+      useLocationStore.getState().setNearbyPoisCount(incoming.length);
     } catch (err) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
@@ -412,13 +414,18 @@ export default function HomeScreen() {
   useEffect(() => {
     const autoStartSession = async () => {
       try {
+        const deviceInfo = `${Platform.OS} ${Platform.Version}`;
+        const currentTourId = useTourStore.getState().activeTour?.id;
         const res = await sessionService.start({
+          tourId: currentTourId,
+          deviceInfo,
           offlineMode: false,
           appVersion: "mobile-mvp",
         });
         const id = res.data.data?.id;
         if (id) {
           setSessionId(id);
+          sessionService.setActiveSessionId(id);
         }
       } catch {
         // Session auto-start failed silently

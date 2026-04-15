@@ -3,7 +3,9 @@ import {
   audioManager,
   audioInitialState,
 } from "../services/audio/AudioManager";
+import type { AudioFinishedPayload } from "../services/audio/AudioManager";
 import { poiService } from "../services/poi.service";
+import { sessionService } from "../services/session.service";
 import type {
   AudioActions,
   AudioQueueItem,
@@ -11,6 +13,7 @@ import type {
   TriggerType,
 } from "../types/audio.types";
 import type { PoiDetail } from "../types/tourist.types";
+import { useLocationStore } from "./locationStore";
 
 const QUEUE_CAP = 10;
 
@@ -35,12 +38,45 @@ export const useAudioStore = create<AudioStore>((set, get) => {
   );
 
   // ─── Auto-advance queue when audio finishes ────────────────────────────────
-  audioManager.onFinished = (finishedPoiId: string | null) => {
+  audioManager.onFinished = (payload: AudioFinishedPayload) => {
     const { queue } = get();
+    const {
+      finishedPoiId,
+      triggerType,
+      playDurationSeconds,
+      totalDurationSeconds,
+      completed,
+    } = payload;
 
     // Increment POI priority when user listens to full TTS
     if (finishedPoiId) {
       void poiService.incrementPriority(finishedPoiId).catch(() => {});
+    }
+
+    // ── Push audio play history to session (with accurate duration data) ──
+    if (finishedPoiId && triggerType) {
+      try {
+        const sessionId = sessionService.getActiveSessionId();
+        if (sessionId) {
+          const triggerMap: Record<
+            TriggerType,
+            "gps_proximity" | "qr_scan" | "manual"
+          > = {
+            proximity: "gps_proximity",
+            qr: "qr_scan",
+            manual: "manual",
+          };
+          void sessionService.pushAudioPlay(sessionId, {
+            poiId: finishedPoiId,
+            triggerType: triggerMap[triggerType],
+            playDurationSeconds,
+            totalDurationSeconds,
+            completed,
+          });
+        }
+      } catch {
+        // Audio history push failed silently
+      }
     }
 
     if (queue.length > 0) {
@@ -101,6 +137,7 @@ export const useAudioStore = create<AudioStore>((set, get) => {
 
     addPlayedPoiId: (id: string) => {
       set((state) => ({ playedPoiIds: [...state.playedPoiIds, id] }));
+      useLocationStore.getState().incrementTotalPoisHeard();
     },
 
     clearPlayedPois: () => {

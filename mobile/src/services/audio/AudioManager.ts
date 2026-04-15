@@ -16,6 +16,15 @@ export type AudioStateUpdater = (
   updater: (prev: AudioState) => AudioState,
 ) => void;
 
+/** Data passed when audio finishes playing */
+export interface AudioFinishedPayload {
+  finishedPoiId: string | null;
+  triggerType: TriggerType | null;
+  playDurationSeconds: number;
+  totalDurationSeconds: number;
+  completed: boolean;
+}
+
 const initialState = (): AudioState => ({
   activePoi: null,
   status: "idle",
@@ -41,6 +50,8 @@ class AudioManager {
   private setState: AudioStateUpdater = () => {};
   private cooldowns = new Map<string, number>();
   private isProcessing = false;
+  /** Track the trigger type of the currently playing audio */
+  private activeTriggerType: TriggerType | null = null;
 
   init(setState: AudioStateUpdater): void {
     this.setState = setState;
@@ -139,6 +150,7 @@ class AudioManager {
     if (this.isProcessing) return;
     this.isProcessing = true;
 
+    this.activeTriggerType = triggerType;
     this.setState((prev) => ({
       ...prev,
       activePoi: poi,
@@ -227,21 +239,35 @@ class AudioManager {
   }
 
   private async handleFinished(): Promise<void> {
-    // Capture the finished POI id BEFORE clearing state
+    // Capture duration data BEFORE clearing state
     let finishedPoiId: string | null = null;
+    let positionSeconds = 0;
+    let durationSeconds = 0;
     this.setState((prev) => {
       finishedPoiId = prev.activePoi?.id ?? null;
+      positionSeconds = prev.positionSeconds;
+      durationSeconds = prev.durationSeconds;
       if (prev.queue.length === 0) {
         return { ...prev, activePoi: null, status: "idle", progress: 1 };
       }
       return prev;
     });
 
+    const payload: AudioFinishedPayload = {
+      finishedPoiId,
+      triggerType: this.activeTriggerType,
+      playDurationSeconds: Math.round(positionSeconds),
+      totalDurationSeconds: Math.round(durationSeconds),
+      completed:
+        durationSeconds > 0 && positionSeconds >= durationSeconds * 0.9,
+    };
+    this.activeTriggerType = null;
+
     await audioPlayer.unload();
-    this.onFinished?.(finishedPoiId);
+    this.onFinished?.(payload);
   }
 
-  onFinished?: (finishedPoiId: string | null) => void;
+  onFinished?: (payload: AudioFinishedPayload) => void;
 
   async play(): Promise<void> {
     await audioPlayer.play();

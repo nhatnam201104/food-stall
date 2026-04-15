@@ -11,12 +11,18 @@ interface LocationState {
   hasPermission: boolean;
   /** Whether we've received at least one location update */
   hasInitialLocation: boolean;
+  /** Total number of POIs currently loaded on the map */
+  nearbyPoisCount: number;
+  /** Cumulative count of POIs heard across all sessions (not reset on tour restart) */
+  totalPoisHeardCount: number;
 }
 
 // ─── Location Store Actions ───────────────────────────────────────────────────
 interface LocationActions {
   setUserLocation: (coords: { latitude: number; longitude: number }) => void;
   setHasPermission: (granted: boolean) => void;
+  setNearbyPoisCount: (count: number) => void;
+  incrementTotalPoisHeard: () => void;
   reset: () => void;
 }
 
@@ -26,6 +32,8 @@ const initialState: LocationState = {
   userLocation: null,
   hasPermission: false,
   hasInitialLocation: false,
+  nearbyPoisCount: 0,
+  totalPoisHeardCount: 0,
 };
 
 /**
@@ -49,6 +57,11 @@ export const useLocationStore = create<LocationStore>((set) => ({
     })),
 
   setHasPermission: (granted) => set({ hasPermission: granted }),
+
+  setNearbyPoisCount: (count) => set({ nearbyPoisCount: count }),
+
+  incrementTotalPoisHeard: () =>
+    set((prev) => ({ totalPoisHeardCount: prev.totalPoisHeardCount + 1 })),
 
   reset: () => set(initialState),
 }));

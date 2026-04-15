@@ -1,16 +1,18 @@
-import { prisma } from '../config/database';
-import { hashPassword, comparePassword } from '../utils/hash.util';
-import { signToken } from '../utils/jwt.util';
-import { sendPasswordResetEmail } from '../utils/mail.util';
-import { AppError } from '../errors/app-error';
-import { randomUUID } from 'crypto';
-import { normalizeVietnamPhone } from '../utils/phone.util';
+import { prisma } from "../config/database";
+import { hashPassword, comparePassword } from "../utils/hash.util";
+import { signToken } from "../utils/jwt.util";
+import { sendPasswordResetEmail } from "../utils/mail.util";
+import { AppError } from "../errors/app-error";
+import { randomUUID } from "crypto";
+import { normalizeVietnamPhone } from "../utils/phone.util";
 
 const normalizeOptionalVietnamPhone = (phone?: string): string | undefined => {
-  if (phone === undefined || phone === null || phone === '') return undefined;
+  if (phone === undefined || phone === null || phone === "") return undefined;
   const normalized = normalizeVietnamPhone(phone);
   if (!normalized) {
-    throw AppError.badRequest('Phone number must be a valid Vietnam number (auto format +84)');
+    throw AppError.badRequest(
+      "Phone number must be a valid Vietnam number (auto format +84)",
+    );
   }
   return normalized;
 };
@@ -27,13 +29,18 @@ export const authService = {
   }) {
     const normalizedPhone = normalizeOptionalVietnamPhone(data.phone);
 
-    const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
     if (existingUser) {
-      throw AppError.conflict('Email already in use', 'EMAIL_EXISTS');
+      throw AppError.conflict("Email already in use", "EMAIL_EXISTS");
     }
 
-    const merchantRole = await prisma.role.findUnique({ where: { name: 'merchant' } });
-    if (!merchantRole) throw new AppError('Role configuration error', 500, 'CONFIG_ERROR');
+    const merchantRole = await prisma.role.findUnique({
+      where: { name: "merchant" },
+    });
+    if (!merchantRole)
+      throw new AppError("Role configuration error", 500, "CONFIG_ERROR");
 
     const passwordHash = await hashPassword(data.password);
 
@@ -56,7 +63,7 @@ export const authService = {
       include: { role: true, merchant: true },
     });
 
-    return { user, message: 'Merchant registered successfully. Please login.' };
+    return { user, message: "Merchant registered successfully. Please login." };
   },
 
   async login(email: string, password: string) {
@@ -66,14 +73,24 @@ export const authService = {
     });
 
     if (!user || !(await comparePassword(password, user.passwordHash))) {
-      throw AppError.unauthorized('Invalid email or password', 'INVALID_CREDENTIALS');
+      throw AppError.unauthorized(
+        "Invalid email or password",
+        "INVALID_CREDENTIALS",
+      );
     }
 
     if (!user.isActive) {
-      throw AppError.forbidden('Your account has been deactivated. Please contact support.', 'ACCOUNT_INACTIVE');
+      throw AppError.forbidden(
+        "Your account has been deactivated. Please contact support.",
+        "ACCOUNT_INACTIVE",
+      );
     }
 
-    const token = signToken({ userId: user.id, roleId: user.roleId, roleName: user.role.name });
+    const token = signToken({
+      userId: user.id,
+      roleId: user.roleId,
+      roleName: user.role.name,
+    });
 
     return {
       token,
@@ -106,13 +123,18 @@ export const authService = {
   }) {
     const normalizedPhone = normalizeOptionalVietnamPhone(data.phone);
 
-    const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
     if (existingUser) {
-      throw AppError.conflict('Email already in use', 'EMAIL_EXISTS');
+      throw AppError.conflict("Email already in use", "EMAIL_EXISTS");
     }
 
-    const touristRole = await prisma.role.findUnique({ where: { name: 'tourist' } });
-    if (!touristRole) throw new AppError('Role configuration error', 500, 'CONFIG_ERROR');
+    const touristRole = await prisma.role.findUnique({
+      where: { name: "tourist" },
+    });
+    if (!touristRole)
+      throw new AppError("Role configuration error", 500, "CONFIG_ERROR");
 
     const passwordHash = await hashPassword(data.password);
 
@@ -127,14 +149,19 @@ export const authService = {
       },
     });
 
-    return { message: 'Tourist account registered successfully. Please login.' };
+    return {
+      message: "Tourist account registered successfully. Please login.",
+    };
   },
 
   async loginTourist(email: string, password: string) {
     const result = await this.login(email, password);
 
-    if (result.user.role !== 'tourist') {
-      throw AppError.forbidden('This login is only available for tourist accounts', 'ROLE_NOT_ALLOWED');
+    if (result.user.role !== "tourist") {
+      throw AppError.forbidden(
+        "This login is only available for tourist accounts",
+        "ROLE_NOT_ALLOWED",
+      );
     }
 
     return result;
@@ -145,7 +172,7 @@ export const authService = {
       where: { id: userId },
       include: { role: true, merchant: true },
     });
-    if (!user) throw AppError.notFound('User not found');
+    if (!user) throw AppError.notFound("User not found");
 
     return {
       id: user.id,
@@ -170,14 +197,17 @@ export const authService = {
     };
   },
 
-  async updateProfile(userId: string, data: {
-    fullName?: string;
-    phone?: string;
-    avatarUrl?: string | null;
-    shopName?: string;
-    address?: string;
-    contactEmail?: string;
-  }) {
+  async updateProfile(
+    userId: string,
+    data: {
+      fullName?: string;
+      phone?: string;
+      avatarUrl?: string | null;
+      shopName?: string;
+      address?: string;
+      contactEmail?: string;
+    },
+  ) {
     const normalizedPhone = normalizeOptionalVietnamPhone(data.phone);
 
     const existingUser = await prisma.user.findUnique({
@@ -185,7 +215,7 @@ export const authService = {
       include: { role: true, merchant: true },
     });
 
-    if (!existingUser) throw AppError.notFound('User not found');
+    if (!existingUser) throw AppError.notFound("User not found");
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
@@ -197,13 +227,20 @@ export const authService = {
         },
       });
 
-      if (existingUser.merchant && (data.shopName !== undefined || data.address !== undefined || data.contactEmail !== undefined)) {
+      if (
+        existingUser.merchant &&
+        (data.shopName !== undefined ||
+          data.address !== undefined ||
+          data.contactEmail !== undefined)
+      ) {
         await tx.merchant.update({
           where: { userId },
           data: {
             ...(data.shopName !== undefined && { shopName: data.shopName }),
             ...(data.address !== undefined && { address: data.address }),
-            ...(data.contactEmail !== undefined && { contactEmail: data.contactEmail }),
+            ...(data.contactEmail !== undefined && {
+              contactEmail: data.contactEmail,
+            }),
           },
         });
       }
@@ -214,7 +251,7 @@ export const authService = {
       include: { role: true, merchant: true },
     });
 
-    if (!user) throw AppError.notFound('User not found');
+    if (!user) throw AppError.notFound("User not found");
 
     return {
       id: user.id,
@@ -235,24 +272,67 @@ export const authService = {
     };
   },
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw AppError.notFound('User not found');
+    if (!user) throw AppError.notFound("User not found");
 
     const isMatch = await comparePassword(currentPassword, user.passwordHash);
-    if (!isMatch) throw AppError.badRequest('Current password is incorrect', 'WRONG_PASSWORD');
+    if (!isMatch)
+      throw AppError.badRequest(
+        "Current password is incorrect",
+        "WRONG_PASSWORD",
+      );
 
     const newHash = await hashPassword(newPassword);
-    await prisma.user.update({ where: { id: userId }, data: { passwordHash: newHash } });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
   },
 
-  async forgotPassword(_email: string) {
-    // Token-based reset removed — use OTP flow (/auth/otp/send)
-    throw AppError.badRequest('Please use the OTP-based password reset flow', 'USE_OTP_FLOW');
+  async forgotPassword(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    // Always return success to avoid user enumeration
+    if (!user || !user.isActive) return;
+
+    const token = randomUUID();
+    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordResetToken: token, passwordResetExpiry: expiry },
+    });
+
+    await sendPasswordResetEmail(user.email, user.fullName, token);
   },
 
-  async resetPassword(_token: string, _newPassword: string) {
-    // Token-based reset removed — use OTP flow (/auth/otp/reset)
-    throw AppError.badRequest('Please use the OTP-based password reset flow', 'USE_OTP_FLOW');
+  async resetPassword(token: string, newPassword: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw AppError.badRequest(
+        "Invalid or expired reset token",
+        "INVALID_TOKEN",
+      );
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+      },
+    });
   },
 };

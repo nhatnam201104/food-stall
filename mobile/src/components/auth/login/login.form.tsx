@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Alert,
   View,
@@ -9,20 +9,23 @@ import {
   Platform,
   ScrollView,
   StatusBar,
-} from 'react-native';
-import { Stack, router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { loginSchema } from '../../../libs/validation/auth/login.schema';
-import { useAuthStore } from '../../../stores/auth.store';
-import type { AuthStore } from '../../../stores/auth.store';
-import { authStyles, COLORS } from './auth.styles';
+} from "react-native";
+import { Stack, router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { loginSchema } from "../../../libs/validation/auth/login.schema";
+import { useAuthStore } from "../../../stores/auth.store";
+import type { AuthStore } from "../../../stores/auth.store";
+import { authStyles, COLORS } from "./auth.styles";
 
 const LoginScreen = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    password?: string;
+  }>({});
 
   const loginTourist = useAuthStore((state: AuthStore) => state.loginTourist);
   const isLoading = useAuthStore((state: AuthStore) => state.isLoading);
@@ -44,18 +47,18 @@ const LoginScreen = () => {
     setFieldErrors({});
     const success = await loginTourist(parsed.data);
     if (success) {
-      router.replace('/(tabs)');
+      router.replace("/(tabs)");
       return;
     }
 
     const latestError = useAuthStore.getState().error;
     if (latestError) {
-      Alert.alert('Login error', latestError);
+      Alert.alert("Login error", latestError);
     }
   };
 
-  const navigateToRegister = () => router.push('/auth/register');
-  const navigateToForgotPassword = () => router.push('/auth/forgot-password');
+  const navigateToRegister = () => router.push("/auth/register");
+  const navigateToForgotPassword = () => router.push("/auth/forgot-password");
 
   return (
     <SafeAreaView style={authStyles.container}>
@@ -64,7 +67,7 @@ const LoginScreen = () => {
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView
@@ -74,7 +77,9 @@ const LoginScreen = () => {
           <View style={authStyles.logoContainer}>
             <Ionicons name="fast-food" size={80} color={COLORS.primary} />
             <Text style={authStyles.logoText}>Welcome Back</Text>
-            <Text style={authStyles.subtitle}>Sign in to continue to Food Stall</Text>
+            <Text style={authStyles.subtitle}>
+              Sign in to continue to Food Stall
+            </Text>
           </View>
 
           <View style={authStyles.formContainer}>
@@ -113,19 +118,30 @@ const LoginScreen = () => {
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
                   size={20}
                   color={COLORS.textLight}
                 />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={authStyles.forgotPasswordContainer} onPress={navigateToForgotPassword}>
-              <Text style={authStyles.forgotPasswordText}>Forgot Password?</Text>
+            <TouchableOpacity
+              style={authStyles.forgotPasswordContainer}
+              onPress={navigateToForgotPassword}
+            >
+              <Text style={authStyles.forgotPasswordText}>
+                Forgot Password?
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={authStyles.button} onPress={handleLogin} disabled={isLoading}>
-              <Text style={authStyles.buttonText}>{isLoading ? 'LOADING...' : 'LOGIN'}</Text>
+            <TouchableOpacity
+              style={authStyles.button}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              <Text style={authStyles.buttonText}>
+                {isLoading ? "LOADING..." : "LOGIN"}
+              </Text>
             </TouchableOpacity>
 
             {(fieldErrors.email || fieldErrors.password) && (
@@ -133,23 +149,6 @@ const LoginScreen = () => {
                 {fieldErrors.email || fieldErrors.password}
               </Text>
             )}
-
-            <View style={authStyles.dividerContainer}>
-              <View style={authStyles.divider} />
-              <Text style={authStyles.dividerText}>OR LOGIN WITH</Text>
-              <View style={authStyles.divider} />
-            </View>
-
-            <View style={authStyles.socialContainer}>
-              <TouchableOpacity style={authStyles.socialButton}>
-                <Ionicons name="logo-google" size={20} color={COLORS.google} />
-                <Text style={authStyles.socialButtonText}>Google</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={authStyles.socialButton}>
-                <Ionicons name="logo-facebook" size={20} color={COLORS.facebook} />
-                <Text style={authStyles.socialButtonText}>Facebook</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           <View style={authStyles.footerContainer}>

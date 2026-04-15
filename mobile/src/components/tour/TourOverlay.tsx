@@ -1,8 +1,17 @@
-import { memo, useCallback, useEffect } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { memo, useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTourStore } from "../../stores/tourStore";
 import { useLocationStore } from "../../stores/locationStore";
+import { useAudioStore } from "../../stores/audioStore";
+import { poiService } from "../../services/poi.service";
 
 /** Haversine distance in meters between two lat/lng points */
 function getDistanceMeters(
@@ -52,12 +61,23 @@ const TourOverlayComponent = () => {
   const userLocation = useLocationStore((s) => s.userLocation);
   const checkTourProximity = useTourStore((s) => s.checkTourProximity);
 
+  // ── Audio store: to manually trigger playback for current stop ────────
+  const { triggerPoi, activePoi, status: audioStatus } = useAudioStore();
+  const [isPlayLoading, setIsPlayLoading] = useState(false);
+
   // ── Auto-trigger audio when user reaches current tour stop ────────────
   useEffect(() => {
     if (tourStatus === "active" && userLocation) {
       checkTourProximity();
     }
   }, [tourStatus, userLocation, checkTourProximity]);
+
+  // ── Reset play loading state when audio stops loading ─────────────────
+  useEffect(() => {
+    if (audioStatus !== "loading") {
+      setIsPlayLoading(false);
+    }
+  }, [audioStatus]);
 
   const handleEndTour = useCallback(() => {
     Alert.alert(
@@ -91,6 +111,28 @@ const TourOverlayComponent = () => {
       ],
     );
   }, [activeTour, currentStepIndex, nextStep]);
+
+  // ── Manually play audio for the current tour stop ─────────────────────
+  const handlePlayAudio = useCallback(async () => {
+    if (!activeTour) return;
+    const currentStop = activeTour.tourPois[currentStepIndex];
+    if (!currentStop) return;
+
+    setIsPlayLoading(true);
+    try {
+      const res = await poiService.detail(currentStop.poi.id);
+      const detail = res.data?.data;
+      if (detail) {
+        await triggerPoi(detail, "manual");
+      }
+    } catch {
+      setIsPlayLoading(false);
+      Alert.alert(
+        "Error",
+        `Could not play audio for "${currentStop.poi.name}"`,
+      );
+    }
+  }, [activeTour, currentStepIndex, triggerPoi]);
 
   // ── Don't render if no tour is active ──────────────────────────────────
   if (!activeTour || tourStatus === "idle") return null;
@@ -199,6 +241,35 @@ const TourOverlayComponent = () => {
             </Text>
           </View>
         )}
+
+        {/* ── Play Audio button ─────────────────────────────────────── */}
+        {currentPoi &&
+          (() => {
+            const isCurrentPlaying =
+              activePoi?.id === currentPoi.poi.id &&
+              (audioStatus === "playing" || audioStatus === "loading");
+            const isDisabled =
+              isPlayLoading || isCurrentPlaying || tourStatus === "paused";
+
+            return (
+              <Pressable
+                style={[styles.playBtn, isDisabled && styles.playBtnDisabled]}
+                onPress={() => void handlePlayAudio()}
+                disabled={isDisabled}
+              >
+                {isPlayLoading ||
+                (audioStatus === "loading" &&
+                  activePoi?.id === currentPoi.poi.id) ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : audioStatus === "playing" &&
+                  activePoi?.id === currentPoi.poi.id ? (
+                  <Text style={styles.playBtnText}>🔊 Playing audio...</Text>
+                ) : (
+                  <Text style={styles.playBtnText}>▶ Play Audio Guide</Text>
+                )}
+              </Pressable>
+            );
+          })()}
 
         {/* Controls */}
         <View style={styles.controlsRow}>
@@ -423,6 +494,26 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   endBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  playBtn: {
+    backgroundColor: "#4f46e5",
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 40,
+  },
+  playBtnDisabled: {
+    backgroundColor: "#818cf8",
+    opacity: 0.75,
+  },
+  playBtnText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 14,

@@ -122,6 +122,11 @@ export default function RootLayout() {
         <Stack.Screen name="auth" options={{ headerShown: false }} />
         {/* (tabs) là nhóm trang có thanh menu dưới cùng */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* Tour detail — push over tabs */}
+        <Stack.Screen
+          name="tour/[id]"
+          options={{ title: "Tour Detail", headerBackTitle: "Back" }}
+        />
       </Stack>
       <StatusBar style="light" />
     </SafeAreaProvider>
