@@ -1,5 +1,5 @@
 export type PoiAudioMode = 'tts' | 'file';
-export type PoiLanguageCode = 'vi' | 'en' | 'zh' | 'ja' | 'ko';
+export type PoiLanguageCode = 'vi' | 'en' | 'zh';
 export type PoiStatus = 'active' | 'inactive';
 export type PoiApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type TourStatus = 'active' | 'draft' | 'archived';

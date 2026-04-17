@@ -43,7 +43,7 @@ const PoiAudioPreview = ({
     return (
       <TtsPreview
         text={ttsContent}
-        sourceLanguage='auto'
+        sourceLanguage={languageCode}
         defaultPreviewLanguage={languageCode}
       />
     );
