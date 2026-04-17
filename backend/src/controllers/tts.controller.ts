@@ -17,7 +17,7 @@ export const ttsController = {
       const sourceLanguage =
         typeof req.body?.sourceLanguage === "string"
           ? req.body.sourceLanguage
-          : "vi";
+          : "auto";
 
       if (!text.trim()) {
         throw AppError.badRequest("Text is required for TTS preview");
