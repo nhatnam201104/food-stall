@@ -15,7 +15,7 @@ export type SupportedLanguage =
   | "th"
   | "id";
 
-const SUPPORTED: SupportedLanguage[] = [
+export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
   "vi",
   "en",
   "zh",
@@ -41,13 +41,13 @@ export function normalizeToBaseLang(raw: string): SupportedLanguage {
   const lower = raw.trim().toLowerCase();
 
   // Direct match (e.g. 'vi', 'en', 'ja')
-  if (SUPPORTED.includes(lower as SupportedLanguage)) {
+  if (SUPPORTED_LANGUAGES.includes(lower as SupportedLanguage)) {
     return lower as SupportedLanguage;
   }
 
   // Extract base code from BCP-47 (e.g. 'ja-JP' → 'ja', 'zh-Hans' → 'zh')
   const base = lower.split("-")[0];
-  if (SUPPORTED.includes(base as SupportedLanguage)) {
+  if (SUPPORTED_LANGUAGES.includes(base as SupportedLanguage)) {
     return base as SupportedLanguage;
   }
 
@@ -79,13 +79,13 @@ export function detectDeviceLanguage(): SupportedLanguage {
       const lang = (locale.languageCode ?? "").toLowerCase();
 
       // Exact match
-      if (SUPPORTED.includes(lang as SupportedLanguage)) {
+      if (SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)) {
         return lang as SupportedLanguage;
       }
 
       // Handle regional variants: zh-Hans, zh-Hant, en-US, en-GB
       const base = lang.split("-")[0];
-      if (SUPPORTED.includes(base as SupportedLanguage)) {
+      if (SUPPORTED_LANGUAGES.includes(base as SupportedLanguage)) {
         return base as SupportedLanguage;
       }
     }

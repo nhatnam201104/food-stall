@@ -138,23 +138,32 @@ class TTSService {
    * Download a remote audio file URL and cache it locally.
    * Used when poi.audioMode = 'file' and audioUrl is a remote https:// link.
    * @param poiId - cache key
-   * @param audioUrl - remote URL
+   * @param audioUrl - remote URL (may contain localhost — reconstructed to active API base)
    * @returns local file URI
    */
   async downloadAndCache(poiId: string, audioUrl: string): Promise<string> {
-    // 1. Cache first
     const cached = await audioCache.get(poiId);
     if (cached) return cached;
 
-    // 2. Download binary
-    const response = await axiosInstance.get(audioUrl, {
+    // Reconstruct URL: audioUrl may contain localhost (unreachable from mobile).
+    // Extract /uploads/... path, prepend active API origin.
+    const apiBase = axiosInstance.defaults.baseURL ?? "";
+    const origin = apiBase.replace(/\/api\/v1\/?$/, "");
+    let resolvedUrl = audioUrl;
+    try {
+      const url = new URL(audioUrl);
+      resolvedUrl = `${origin}${url.pathname}`;
+    } catch {
+      // audioUrl is already a relative path like /uploads/file.mp3
+      resolvedUrl = `${origin}${audioUrl}`;
+    }
+
+    const response = await axiosInstance.get(resolvedUrl, {
       responseType: "arraybuffer",
       timeout: 30_000,
-      // Bypass base URL for absolute URLs
       baseURL: "",
     });
 
-    // 3. Convert and cache
     const base64 = arrayBufferToBase64(response.data as ArrayBuffer);
     const fileUri = audioCache.set(poiId, base64);
     return fileUri;

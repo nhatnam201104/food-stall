@@ -23,8 +23,10 @@ import { ProximityTracker } from "../../services/proximity/ProximityTracker";
 import { poiService } from "../../services/poi.service";
 import { sessionService } from "../../services/session.service";
 import { useAudioStore } from "../../stores/audioStore";
+import { useLanguageStore } from "../../stores/languageStore";
 import { useLocationStore } from "../../stores/locationStore";
 import { useTourStore } from "../../stores/tourStore";
+import { LANGUAGE_LABELS } from "../../utils/language.util";
 import { getTourRoute } from "../../services/routing.service";
 import type { RouteCoordinate } from "../../services/routing.service";
 import type { PoiDetail, PoiMarker } from "../../types/tourist.types";
@@ -88,6 +90,9 @@ export default function HomeScreen() {
     playedPoiIds,
     isPoiInCooldown,
   } = useAudioStore();
+
+  // ── Language store ──────────────────────────────────────────────────────
+  const appLanguage = useLanguageStore((s) => s.appLanguage);
 
   // ── Tour store ──────────────────────────────────────────────────────────
   const activeTour = useTourStore((s) => s.activeTour);
@@ -781,7 +786,7 @@ export default function HomeScreen() {
                     </Text>
                     {detailPoi.poiAudio.map((audio) => (
                       <Text key={audio.id} style={styles.detailMeta}>
-                        {audio.languageCode.toUpperCase()} — {audio.status}
+                        {LANGUAGE_LABELS[appLanguage]} — {audio.status}
                       </Text>
                     ))}
                   </View>

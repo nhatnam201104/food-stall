@@ -1,17 +1,39 @@
-import { Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
 import { useAuthStore } from "../../stores/auth.store";
 import type { AuthStore } from "../../stores/auth.store";
 import { useAudioStore } from "../../stores/audioStore";
 import { useTourStore } from "../../stores/tourStore";
 import { useLocationStore } from "../../stores/locationStore";
+import { useLanguageStore } from "../../stores/languageStore";
+import {
+  LANGUAGE_LABELS,
+  detectDeviceLanguage,
+  type SupportedLanguage,
+  SUPPORTED_LANGUAGES,
+} from "../../utils/language.util";
 import { styles } from "./settings-screen.styles";
 
 const SettingsScreen = () => {
   const logout = useAuthStore((state: AuthStore) => state.logout);
   const user = useAuthStore((state: AuthStore) => state.user);
+
+  // ── Language ───────────────────────────────────────────────────────────────
+  const appLanguage = useLanguageStore((s) => s.appLanguage);
+  const setAppLanguage = useLanguageStore((s) => s.setAppLanguage);
+  const syncWithDevice = useLanguageStore((s) => s.syncWithDevice);
+  const [isLangModalOpen, setIsLangModalOpen] = useState(false);
 
   // ── Today Snapshot data ────────────────────────────────────────────────────
   const playedPoiIds = useAudioStore((s) => s.playedPoiIds);
@@ -58,6 +80,23 @@ const SettingsScreen = () => {
   const handleProfilePress = () => {
     router.push("/profile");
   };
+
+  const handleLanguagePress = () => {
+    setIsLangModalOpen(true);
+  };
+
+  const handleSelectLanguage = (lang: SupportedLanguage) => {
+    const deviceLang = detectDeviceLanguage();
+    if (lang === deviceLang) {
+      syncWithDevice();
+    } else {
+      setAppLanguage(lang);
+    }
+    setIsLangModalOpen(false);
+  };
+
+  const deviceLang = detectDeviceLanguage();
+  const isUsingDevice = appLanguage === deviceLang;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -158,17 +197,26 @@ const SettingsScreen = () => {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Audio guide</Text>
+          <Pressable onPress={handleLanguagePress} style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>POI Audio Language</Text>
+              <Text style={styles.settingDesc}>
+                {isUsingDevice
+                  ? `${LANGUAGE_LABELS[appLanguage]} (Default)`
+                  : LANGUAGE_LABELS[appLanguage]}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Coming soon</Text>
           <View style={styles.featureItem}>
             <Text style={styles.featureTitle}>🔔 Smart POI notifications</Text>
             <Text style={styles.featureDesc}>
               Get context-aware suggestions when approaching interesting places.
-            </Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureTitle}>🎧 Audio guide preferences</Text>
-            <Text style={styles.featureDesc}>
-              Set language, playback speed and auto-play behavior.
             </Text>
           </View>
           <View style={styles.featureItem}>
@@ -183,6 +231,78 @@ const SettingsScreen = () => {
           <Text style={styles.logoutText}>Logout</Text>
         </Pressable>
       </ScrollView>
+
+      {/* ── Language Picker Modal ──────────────────────────────────────────── */}
+      <Modal
+        visible={isLangModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLangModalOpen(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setIsLangModalOpen(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>POI Audio Language</Text>
+
+            {/* Device default option */}
+            <Pressable
+              style={[
+                styles.langItem,
+                isUsingDevice && styles.langItemActive,
+              ]}
+              onPress={() => handleSelectLanguage(deviceLang)}
+            >
+              <Text
+                style={[
+                  styles.langText,
+                  isUsingDevice && styles.langTextActive,
+                ]}
+              >
+                {LANGUAGE_LABELS[deviceLang]}
+              </Text>
+              <Text style={styles.langBadge}>Default</Text>
+              {isUsingDevice && (
+                <Ionicons name="checkmark" size={20} color="#4f46e5" />
+              )}
+            </Pressable>
+
+            {/* Other languages */}
+            {SUPPORTED_LANGUAGES.filter((l) => l !== deviceLang).map(
+              (lang: SupportedLanguage) => (
+                <Pressable
+                  key={lang}
+                  style={[
+                    styles.langItem,
+                    appLanguage === lang && styles.langItemActive,
+                  ]}
+                  onPress={() => handleSelectLanguage(lang)}
+                >
+                  <Text
+                    style={[
+                      styles.langText,
+                      appLanguage === lang && styles.langTextActive,
+                    ]}
+                  >
+                    {LANGUAGE_LABELS[lang]}
+                  </Text>
+                  {appLanguage === lang && (
+                    <Ionicons name="checkmark" size={20} color="#4f46e5" />
+                  )}
+                </Pressable>
+              ),
+            )}
+
+            <Pressable
+              style={styles.modalCancelBtn}
+              onPress={() => setIsLangModalOpen(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 };

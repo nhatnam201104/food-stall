@@ -11,6 +11,7 @@ import { STORAGE_KEYS } from "../constants/storage.constants";
 import { useAuthStore } from "../stores/auth.store";
 import type { AuthStore } from "../stores/auth.store";
 import { useLocationStore } from "../stores/locationStore";
+import { useLanguageStore } from "../stores/languageStore";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,6 +31,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     hydrateFromStorage();
+    useLanguageStore.getState().hydrate();
   }, [hydrateFromStorage]);
 
   useEffect(() => {

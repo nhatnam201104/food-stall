@@ -1,4 +1,3 @@
-import * as Localization from "expo-localization";
 import type {
   AudioQueueItem,
   AudioState,
@@ -77,66 +76,46 @@ class AudioManager {
   }
 
   /**
-   * Get the device's native language for TTS voice selection.
-   * Falls back to appLanguage if device locale is unavailable.
-   */
-  private getDeviceLanguage(): SupportedLanguage {
-    const locales = Localization.getLocales();
-    const deviceLang = locales[0]?.languageCode;
-    if (deviceLang) {
-      // Normalize: only take the primary language code (e.g., "vi" from "vi-VN")
-      const normalized = deviceLang.split("-")[0].toLowerCase();
-      return normalized as SupportedLanguage;
-    }
-    return useLanguageStore.getState().appLanguage;
-  }
-
-  /**
    * Resolve audio URI via tiered fallback chain.
    *
-   * Strategy: Always send the original ttsContent (Vietnamese) to the backend
-   * with sourceLanguage="vi" and targetLanguage=deviceLanguage.
-   * The backend handles translation + TTS generation.
+   * Uses appLanguage from store (user's POI language setting) as TTS target.
+   * Backend handles translation from source language to target language.
    *
    * - Tier 1: Pre-recorded audio file → play directly
-   * - Tier 2: ttsContent exists → send to backend with deviceLanguage + sourceLanguage="vi"
+   * - Tier 2: ttsContent → send to backend with appLanguage + sourceLanguage
    * - Tier 3: Fallback → original description, backend handles translation
    */
   private async resolveAudioUri(poi: PoiDetail): Promise<string> {
     const appLanguage = useLanguageStore.getState().appLanguage;
-    const deviceLanguage = this.getDeviceLanguage();
     const audioRecord = poi.poiAudio?.[0];
 
+    // Source language of the original content (default: Vietnamese)
     const contentLanguage: SupportedLanguage =
-      (audioRecord?.languageCode as SupportedLanguage | undefined) ??
-      appLanguage;
+      (audioRecord?.languageCode as SupportedLanguage | undefined) ?? "vi";
 
     // ─── Tier 1: Pre-recorded audio file ────────────────────────────────────
     if (audioRecord?.audioUrl) {
       try {
         return await ttsService.downloadAndCache(poi.id, audioRecord.audioUrl);
-      } catch {
-        // Fall through to TTS
+      } catch (error) {
+        console.log("Failed to download pre-recorded audio, falling back to TTS");
+        console.error(error);
       }
     }
 
     // ─── Tier 2: ttsContent → send to backend for translation + TTS ──────────
-    // Always send original ttsContent with sourceLanguage so backend can translate.
-    // - deviceLanguage="vi" → source=vi, target=vi → no translation, Vietnamese voice
-    // - deviceLanguage="en" → source=vi, target=en → translate vi→en, English voice
-    // - deviceLanguage="zh" → source=vi, target=zh → translate vi→zh, Chinese voice
     if (audioRecord?.ttsContent) {
       return await ttsService.generateAudio(
         poi.id,
         audioRecord.ttsContent,
-        deviceLanguage,
-        contentLanguage, // sourceLanguageOverride — always "vi" for original content
+        appLanguage,
+        contentLanguage,
       );
     }
 
     // ─── Tier 3: Fallback — original description ────────────────────────────
     const fallbackText = poi.description ?? poi.name;
-    return await ttsService.generateAudio(poi.id, fallbackText);
+    return await ttsService.generateAudio(poi.id, fallbackText, appLanguage, "vi");
   }
 
   async startPlayback(poi: PoiDetail, triggerType: TriggerType): Promise<void> {
@@ -160,10 +139,9 @@ class AudioManager {
       durationSeconds: 0,
       errorMessage: null,
     }));
-
     try {
       const fileUri = await this.resolveAudioUri(poi);
-
+     
       await audioPlayer.load(fileUri, (update) => {
         if (update.didFinish) {
           void this.handleFinished();
@@ -199,6 +177,7 @@ class AudioManager {
       void this.logPlayHistory(poi, triggerType);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Audio playback error";
+      console.log ("Audio playback error:", msg);
       this.setState((prev) => ({
         ...prev,
         activePoi: null,

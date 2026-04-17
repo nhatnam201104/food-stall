@@ -9,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import { useAudioStore } from '../../stores/audioStore';
+import { useLanguageStore } from '../../stores/languageStore';
+import { LANGUAGE_LABELS } from '../../utils/language.util';
 import type { PoiDetail } from '../../types/tourist.types';
 import { getFullImageUrl } from '../../utils/image-url.util';
 import { styles } from './poi-result-modal.styles';
@@ -31,6 +33,7 @@ export function PoiResultModal({
   onPlayAudio,
 }: Props) {
   const { status, activePoi } = useAudioStore();
+  const appLanguage = useLanguageStore((s) => s.appLanguage);
   const isCurrentPlaying =
     activePoi?.id === poi?.id && (status === "playing" || status === "loading");
 
@@ -179,7 +182,7 @@ export function PoiResultModal({
                   </Text>
                   {poi.poiAudio.map((audio) => (
                     <Text key={audio.id} style={styles.meta}>
-                      {audio.languageCode.toUpperCase()} — {audio.status}
+                      {LANGUAGE_LABELS[appLanguage]} — {audio.status}
                     </Text>
                   ))}
                 </View>
