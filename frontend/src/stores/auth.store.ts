@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { authService } from '../services/auth.service';
 import type { AuthSessionUser, LoginPayload, MerchantRegisterPayload, UpdateProfilePayload } from '../types/auth.types';
 import { clearAuthSession, getAuthSession, saveAuthSession } from '../utils/auth.utils';
+import { isTokenExpired } from '../utils/jwt.utils';
 
 interface AuthStore {
   user: AuthSessionUser | null;
@@ -44,6 +45,19 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ isHydrated: true });
       return;
     }
+    
+    // Kiểm tra token expire ngay khi load trang
+    if (isTokenExpired(session.token)) {
+      clearSession();
+      // Lưu flag để trang login hiển thị thông báo
+      sessionStorage.setItem('session_expired', 'true');
+      set({ isHydrated: true });
+      return;
+    }
+    
+    // Xóa flag nếu token còn hiệu lực
+    sessionStorage.removeItem('session_expired');
+    
     set({ user: session.user, token: session.token, isAuthenticated: true, isHydrated: true });
   },
 

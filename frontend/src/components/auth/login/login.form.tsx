@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Divider, Form, Input, Space, Typography } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ROUTES } from '../../../constants';
 import { useAuthStore } from '../../../stores';
 import type { LoginPayload } from '../../../types';
@@ -12,6 +12,24 @@ const LoginForm = () => {
 	const navigate = useNavigate();
 	const { login, logout, isLoading, error, clearError } = useAuthStore();
 	const [roleError, setRoleError] = useState<string | null>(null);
+	const [searchParams] = useSearchParams();
+	
+	// Check expired từ 2 nguồn:
+	// 1. Query param ?expired=true (từ API redirect khi 401)
+	// 2. Session storage flag (từ token expiry khi load trang)
+	const isExpired = searchParams.get('expired') === 'true' || sessionStorage.getItem('session_expired') === 'true';
+	
+	// Cleanup sau khi check
+	useEffect(() => {
+		if (isExpired) {
+			// Xóa query param
+			const url = new URL(window.location.href);
+			url.searchParams.delete('expired');
+			window.history.replaceState({}, '', url.pathname);
+			// Xóa session storage flag
+			sessionStorage.removeItem('session_expired');
+		}
+	}, [isExpired]);
 
 	const {
 		control,
@@ -50,6 +68,15 @@ const LoginForm = () => {
 
 			{error && <Alert type="error" showIcon message={error} closable onClose={clearError} />}
 		{roleError && <Alert type="error" showIcon message={roleError} closable onClose={() => setRoleError(null)} />}
+		{isExpired && (
+			<Alert
+				type="warning"
+				showIcon
+				message="Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+				closable
+				onClose={() => {}}
+			/>
+		)}
 
 			<Form layout="vertical" onFinish={handleSubmit(onSubmit)} autoComplete="off">
 				<Form.Item label="Email" validateStatus={errors.email ? 'error' : ''} help={errors.email?.message}>
