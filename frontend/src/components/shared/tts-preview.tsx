@@ -8,22 +8,22 @@ import type { PoiLanguageCode } from '../../types';
 
 interface TtsPreviewProps {
   text?: string | null;
-  sourceLanguage?: PoiLanguageCode;
+  sourceLanguage?: PoiLanguageCode | 'auto';
   defaultPreviewLanguage?: PoiLanguageCode;
   size?: 'small' | 'middle' | 'large';
 }
-const TtsPreview = ({ text, sourceLanguage = 'vi', defaultPreviewLanguage, size = 'small' }: TtsPreviewProps) => {
+const TtsPreview = ({ text, sourceLanguage = 'auto', defaultPreviewLanguage, size = 'small' }: TtsPreviewProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isServerLoading, setIsServerLoading] = useState(false);
-  const [previewLanguage, setPreviewLanguage] = useState<PoiLanguageCode>(defaultPreviewLanguage || sourceLanguage || 'vi');
+  const [previewLanguage, setPreviewLanguage] = useState<PoiLanguageCode>(defaultPreviewLanguage || 'vi');
   const htmlAudioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const normalizedText = useMemo(() => (text || '').trim(), [text]);
   const textLength = normalizedText.length;
 
   useEffect(() => {
-    setPreviewLanguage(defaultPreviewLanguage || sourceLanguage || 'vi');
-  }, [defaultPreviewLanguage, sourceLanguage]);
+    setPreviewLanguage(defaultPreviewLanguage || 'vi');
+  }, [defaultPreviewLanguage]);
 
   useEffect(() => {
     return () => {
