@@ -9,6 +9,7 @@ import AdminToursPage from '../pages/admin/tours.page';
 import AdminToursCreatePage from '../pages/admin/tours-create.page';
 import AdminToursEditPage from '../pages/admin/tours-edit.page';
 import AdminUsersPage from '../pages/admin/users.page';
+import AdminMonitoringPage from '../pages/admin/monitoring.page';
 import { AdminProtectedRoute } from './guards/protected-route.guard';
 import { RoleGuard } from './guards/role.guard';
 
@@ -18,6 +19,7 @@ const adminRoutes = (
 			<Route path={ROUTES.admin.root} element={<AdminLayout />}>
 				<Route index element={<Navigate to={ROUTES.admin.dashboard} replace />} />
 				<Route path="dashboard" element={<AdminDashboardPage />} />
+				<Route path="monitoring" element={<AdminMonitoringPage />} />
 				<Route path="users" element={<AdminUsersPage />} />
 				<Route path="pois" element={<AdminPoisPage />} />
 				<Route path="pois/:id" element={<AdminPoisDetailPage />} />

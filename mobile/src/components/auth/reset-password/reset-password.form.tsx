@@ -14,7 +14,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authOtpService } from '../../../services/auth-otp.service';
-import { authStyles, COLORS } from '../login/auth.styles';
+import { authStyles, COLORS } from '../auth.styles';
 
 const ResetPasswordForm = () => {
   const { email, otp } = useLocalSearchParams<{ email: string; otp: string }>();
@@ -44,8 +44,8 @@ const ResetPasswordForm = () => {
       if (response.success) {
         Alert.alert(
           'Success',
-          'Your password has been reset successfully. Please login with your new password.',
-          [{ text: 'OK', onPress: () => router.replace('/auth/login') }],
+          'Your password has been reset successfully.',
+          [{ text: 'OK', onPress: () => router.replace('/(tabs)') }],
         );
       } else {
         Alert.alert('Error', response.message || 'Failed to reset password');

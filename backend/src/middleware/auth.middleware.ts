@@ -23,6 +23,22 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
   }
 };
 
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+
+    try {
+      req.user = verifyToken(token);
+    } catch {
+      req.user = undefined;
+    }
+  }
+
+  next();
+};
+
 export const authorize = (...roles: string[]) =>
   (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {

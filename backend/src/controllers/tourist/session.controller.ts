@@ -10,7 +10,8 @@ type AuthenticatedRequest = Request & {
   };
 };
 
-const getUserId = (req: AuthenticatedRequest): string => String(req.user?.userId ?? '');
+const getUserId = (req: AuthenticatedRequest): string | null =>
+  req.user?.roleName === 'tourist' ? req.user.userId : null;
 const getSessionId = (req: Request): string => String(req.params['id'] ?? '');
 
 export const touristSessionController = {
@@ -18,6 +19,13 @@ export const touristSessionController = {
     try {
       const session = await touristSessionService.start(getUserId(req as AuthenticatedRequest), req.body);
       sendCreated(res, session, 'Session started successfully');
+    } catch (err) { next(err); }
+  },
+
+  async heartbeat(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await touristSessionService.heartbeat(getSessionId(req), getUserId(req as AuthenticatedRequest));
+      sendSuccess(res, result, 'Session heartbeat recorded successfully');
     } catch (err) { next(err); }
   },
 

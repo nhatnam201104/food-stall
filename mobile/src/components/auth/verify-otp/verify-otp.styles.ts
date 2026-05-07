@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { COLORS } from '../login/auth.styles';
+import { COLORS } from '../auth.styles';
 
 export const styles = StyleSheet.create({
   otpContainer: {

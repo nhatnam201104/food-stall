@@ -17,7 +17,7 @@ import { registerSchema } from '../../../libs/validation/auth/register.schema';
 import { normalizePhone } from '../../../utils/phone.util';
 import { useAuthStore } from '../../../stores/auth.store';
 import type { AuthStore } from '../../../stores/auth.store';
-import { authStyles, COLORS } from '../login/auth.styles';
+import { authStyles, COLORS } from '../auth.styles';
 
 const RegisterScreen = () => {
   const [name, setName] = useState('');
@@ -68,7 +68,7 @@ const RegisterScreen = () => {
     }
   };
 
-  const navigateToLogin = () => router.push('/auth/login');
+  const navigateToApp = () => router.replace('/(tabs)');
 
   return (
     <SafeAreaView style={authStyles.container}>
@@ -198,9 +198,9 @@ const RegisterScreen = () => {
           </View>
 
           <View style={authStyles.footerContainer}>
-            <Text style={authStyles.footerText}>Already have an account?</Text>
-            <TouchableOpacity onPress={navigateToLogin}>
-              <Text style={authStyles.footerLink}>Login</Text>
+            <Text style={authStyles.footerText}>No account is required.</Text>
+            <TouchableOpacity onPress={navigateToApp}>
+              <Text style={authStyles.footerLink}>Back to app</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

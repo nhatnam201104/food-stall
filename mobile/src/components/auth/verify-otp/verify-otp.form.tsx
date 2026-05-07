@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authOtpService } from '../../../services/auth-otp.service';
 import { styles } from './verify-otp.styles';
-import { authStyles, COLORS } from '../login/auth.styles';
+import { authStyles, COLORS } from '../auth.styles';
 
 const VerifyOtpForm = () => {
   const params = useLocalSearchParams<{ email: string; expiresIn?: string }>();

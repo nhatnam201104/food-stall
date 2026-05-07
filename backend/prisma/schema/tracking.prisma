@@ -2,13 +2,13 @@
 
 model UserSession {
   id          String    @id @default(uuid())
-  userId      String    @map("user_id")
+  userId      String?   @map("user_id")
   tourId      String?   @map("tour_id")
   startedAt   DateTime  @default(now()) @map("started_at")
   endedAt     DateTime? @map("ended_at")
   deviceInfo  String?   @map("device_info") @db.VarChar(200)
 
-  user             User               @relation(fields: [userId], references: [id])
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
   tour             Tour?              @relation(fields: [tourId], references: [id])
   audioPlayHistory AudioPlayHistory[]
 

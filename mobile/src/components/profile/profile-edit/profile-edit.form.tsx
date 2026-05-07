@@ -109,6 +109,29 @@ const ProfileEditForm = () => {
     router.back();
   };
 
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.heading}>Visitor Profile</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Guest mode</Text>
+            <Text style={styles.helperText}>
+              You can use the tour features directly without signing in.
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView

@@ -15,6 +15,7 @@ import { styles } from './profile-view.styles';
 
 const ProfileView = () => {
   const user = useAuthStore((state: AuthStore) => state.user);
+  const hasAccount = Boolean(user);
 
   const handleEditProfile = () => {
     router.push('/profile/edit');
@@ -24,8 +25,8 @@ const ProfileView = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.heading}>Profile</Text>
-          <Text style={styles.subheading}>Your personal information</Text>
+          <Text style={styles.heading}>Visitor Profile</Text>
+          <Text style={styles.subheading}>Your current app session</Text>
         </View>
 
         <View style={styles.profileCard}>
@@ -38,7 +39,7 @@ const ProfileView = () => {
                 />
               ) : (
                 <Text style={styles.avatarText}>
-                  {(user?.fullName?.[0] || 'T').toUpperCase()}
+                  {(user?.fullName?.[0] || 'G').toUpperCase()}
                 </Text>
               )}
             </View>
@@ -48,10 +49,10 @@ const ProfileView = () => {
           </View>
 
           <View style={styles.profileInfo}>
-            <Text style={styles.name}>{user?.fullName || 'Tourist User'}</Text>
-            <Text style={styles.email}>{user?.email || 'tourist@example.com'}</Text>
+            <Text style={styles.name}>{user?.fullName || 'Guest Tourist'}</Text>
+            <Text style={styles.email}>{user?.email || 'Anonymous visitor session'}</Text>
             <View style={styles.roleBadge}>
-              <Text style={styles.roleText}>Tourist</Text>
+              <Text style={styles.roleText}>Visitor</Text>
             </View>
           </View>
         </View>
@@ -65,7 +66,7 @@ const ProfileView = () => {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Full Name</Text>
-              <Text style={styles.infoValue}>{user?.fullName || 'Not set'}</Text>
+              <Text style={styles.infoValue}>{user?.fullName || 'Guest Tourist'}</Text>
             </View>
           </View>
 
@@ -75,7 +76,7 @@ const ProfileView = () => {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
+              <Text style={styles.infoValue}>{user?.email || 'Anonymous'}</Text>
             </View>
           </View>
 
@@ -85,7 +86,7 @@ const ProfileView = () => {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Phone</Text>
-              <Text style={styles.infoValue}>{user?.phone || 'Not set'}</Text>
+              <Text style={styles.infoValue}>{user?.phone || 'Not required'}</Text>
             </View>
           </View>
 
@@ -95,31 +96,35 @@ const ProfileView = () => {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Account Status</Text>
-              <Text style={[styles.infoValue, { color: user?.isActive ? '#10b981' : '#ef4444' }]}>
-                {user?.isActive ? 'Active' : 'Inactive'}
+              <Text style={[styles.infoValue, { color: user?.isActive === false ? '#ef4444' : '#10b981' }]}>
+                {user?.isActive === false ? 'Inactive' : 'Active visitor'}
               </Text>
             </View>
           </View>
         </View>
 
-        <Pressable onPress={handleEditProfile} style={styles.editButton}>
-          <Ionicons name="create-outline" size={20} color="#fff" />
-          <Text style={styles.editButtonText}>Edit Profile</Text>
-        </Pressable>
+        {hasAccount && (
+          <Pressable onPress={handleEditProfile} style={styles.editButton}>
+            <Ionicons name="create-outline" size={20} color="#fff" />
+            <Text style={styles.editButtonText}>Edit Profile</Text>
+          </Pressable>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Actions</Text>
 
-          <Pressable style={styles.actionItem} onPress={() => router.push('/profile/change-password')}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="lock-closed-outline" size={20} color="#6366f1" />
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Change Password</Text>
-              <Text style={styles.actionDesc}>Update your account password</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-          </Pressable>
+          {hasAccount && (
+            <Pressable style={styles.actionItem} onPress={() => router.push('/profile/change-password')}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="lock-closed-outline" size={20} color="#6366f1" />
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Change Password</Text>
+                <Text style={styles.actionDesc}>Update your account password</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </Pressable>
+          )}
 
           <Pressable style={styles.actionItem}>
             <View style={styles.actionIcon}>

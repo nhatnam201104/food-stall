@@ -18,6 +18,7 @@ import type { AuthStore } from '../../../stores/auth.store';
 import { styles } from './change-password.styles';
 
 const ChangePasswordForm = () => {
+  const user = useAuthStore((state: AuthStore) => state.user);
   const changePassword = useAuthStore((state: AuthStore) => state.changePassword);
   const isLoading = useAuthStore((state: AuthStore) => state.isLoading);
 
@@ -54,6 +55,29 @@ const ChangePasswordForm = () => {
       Alert.alert('Error', latestError || 'Failed to change password. Please try again.');
     }
   };
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.header}>
+            <Pressable onPress={() => router.back()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="#111827" />
+            </Pressable>
+            <Text style={styles.heading}>Visitor Profile</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Guest mode</Text>
+            <Text style={[styles.errorText, { color: '#6b7280' }]}>
+              No password is required to use the mobile app.
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
