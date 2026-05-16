@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   FlatList,
   Image,
@@ -21,7 +22,12 @@ import { TourOverlay } from "../../components/tour/TourOverlay";
 import { Platform } from "react-native";
 import { ProximityTracker } from "../../services/proximity/ProximityTracker";
 import { poiService } from "../../services/poi.service";
-import { sessionService } from "../../services/session.service";
+import {
+  isQueuedSessionStart,
+  sessionService,
+  type QueuedSessionStart,
+} from "../../services/session.service";
+import { mobileSocketService } from "../../services/socket.service";
 import { useAudioStore } from "../../stores/audioStore";
 import { useLanguageStore } from "../../stores/languageStore";
 import { useLocationStore } from "../../stores/locationStore";
@@ -31,6 +37,7 @@ import { getTourRoute } from "../../services/routing.service";
 import type { RouteCoordinate } from "../../services/routing.service";
 import type { PoiDetail, PoiMarker } from "../../types/tourist.types";
 import { getFullImageUrl } from "../../utils/image-url.util";
+import { setMobileApiAccessEnabled } from "../../configs/axios.config";
 
 const formatCoord = (value: unknown) => {
   if (typeof value === "number" && Number.isFinite(value))
@@ -63,10 +70,28 @@ function formatDistance(meters: number): string {
   return `${(meters / 1000).toFixed(1)}km`;
 }
 
+type AccessState =
+  | { status: "connecting" }
+  | ({
+      status: "queued";
+      nextRetryAt: number;
+    } & QueuedSessionStart)
+  | { status: "ready" }
+  | { status: "error"; message: string; nextRetryAt: number };
+
+const BACKGROUND_SESSION_END_DELAY_MS = 5_000;
+
 export default function HomeScreen() {
   const [pois, setPois] = useState<PoiMarker[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [accessState, setAccessState] = useState<AccessState>({
+    status: "connecting",
+  });
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const sessionIdRef = useRef<string | null>(null);
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const queueRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queueIdRef = useRef<string | null>(null);
 
   // ── POI detail modal state ─────────────────────────────────────────────
   const [detailPoi, setDetailPoi] = useState<PoiDetail | null>(null);
@@ -163,6 +188,16 @@ export default function HomeScreen() {
       // Failed to fetch POI detail
     }
   };
+
+  useEffect(() => {
+    if (accessState.status === "ready") return;
+
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [accessState.status]);
 
   // Initialize tracker ONCE — never recreated
   useEffect(() => {
@@ -267,8 +302,9 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
+    if (accessState.status !== "ready") return;
     void loadPois();
-  }, []);
+  }, [accessState.status]);
 
   const summary = useMemo(
     () => `${pois.length} POIs trên bản đồ`,
@@ -417,32 +453,176 @@ export default function HomeScreen() {
 
   // ── Session (auto-start on mount, silent) ──────────────────────────────
   useEffect(() => {
-    const autoStartSession = async () => {
+    let cancelled = false;
+    let isAppActive = true;
+    let isStarting = false;
+    let isEnding = false;
+    let backgroundEndTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearHeartbeat = () => {
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
+    };
+
+    const clearQueueRetry = () => {
+      if (queueRetryTimerRef.current) {
+        clearTimeout(queueRetryTimerRef.current);
+        queueRetryTimerRef.current = null;
+      }
+    };
+
+    const clearBackgroundEnd = () => {
+      if (backgroundEndTimer) {
+        clearTimeout(backgroundEndTimer);
+        backgroundEndTimer = null;
+      }
+    };
+
+    const activateSession = (sessionId: string, deviceInfo: string) => {
+      clearQueueRetry();
+      queueIdRef.current = null;
+      sessionIdRef.current = sessionId;
+      sessionService.setActiveSessionId(sessionId);
+      setMobileApiAccessEnabled(true);
+      setAccessState({ status: "ready" });
+      mobileSocketService.connect({ sessionId, deviceInfo });
+
+      clearHeartbeat();
+      void sessionService.heartbeat(sessionId).catch(() => {});
+      heartbeatTimerRef.current = setInterval(() => {
+        void sessionService.heartbeat(sessionId).catch(() => {});
+      }, 30_000);
+    };
+
+    const endCurrentSession = async () => {
+      if (isEnding) return;
+      const currentSessionId = sessionIdRef.current;
+      clearQueueRetry();
+      queueIdRef.current = null;
+      setMobileApiAccessEnabled(false);
+      if (!currentSessionId) return;
+
+      isEnding = true;
+      clearHeartbeat();
+      mobileSocketService.endSession(currentSessionId);
+      sessionIdRef.current = null;
+      sessionService.setActiveSessionId(null);
+
       try {
-        const deviceInfo = `${Platform.OS} ${Platform.Version}`;
+        await sessionService.end(currentSessionId);
+      } catch {
+        // Session end is best-effort when the app is leaving foreground.
+      } finally {
+        isEnding = false;
+        if (!cancelled && isAppActive) {
+          void startSession();
+        }
+      }
+    };
+
+    const scheduleBackgroundEnd = () => {
+      clearBackgroundEnd();
+      backgroundEndTimer = setTimeout(() => {
+        backgroundEndTimer = null;
+        void endCurrentSession();
+      }, BACKGROUND_SESSION_END_DELAY_MS);
+    };
+
+    const scheduleQueueRetry = (retryAfterSeconds: number) => {
+      clearQueueRetry();
+      if (cancelled || !isAppActive) return;
+
+      const retryDelayMs = Math.max(retryAfterSeconds, 5) * 1000;
+      queueRetryTimerRef.current = setTimeout(() => {
+        queueRetryTimerRef.current = null;
+        void startSession();
+      }, retryDelayMs);
+    };
+
+    const startSession = async () => {
+      if (isStarting || !isAppActive || isEnding) return;
+
+      const deviceInfo = `${Platform.OS} ${Platform.Version}`;
+      const existingSessionId = sessionIdRef.current ?? sessionService.getActiveSessionId();
+      if (existingSessionId) {
+        activateSession(existingSessionId, deviceInfo);
+        return;
+      }
+
+      isStarting = true;
+      setMobileApiAccessEnabled(false);
+      if (!queueIdRef.current) {
+        setAccessState({ status: "connecting" });
+      }
+      try {
         const currentTourId = useTourStore.getState().activeTour?.id;
         const res = await sessionService.start({
           tourId: currentTourId,
           deviceInfo,
           offlineMode: false,
           appVersion: "mobile-mvp",
+          queueId: queueIdRef.current ?? undefined,
         });
-        const id = res.data.data?.id;
-        if (id) {
-          setSessionId(id);
-          sessionService.setActiveSessionId(id);
+
+        const sessionData = res.data.data;
+        if (isQueuedSessionStart(sessionData)) {
+          queueIdRef.current = sessionData.queueId;
+          setMobileApiAccessEnabled(false);
+          setAccessState({
+            ...sessionData,
+            status: "queued",
+            nextRetryAt: Date.now() + sessionData.retryAfterSeconds * 1000,
+          });
+          scheduleQueueRetry(sessionData.retryAfterSeconds);
+          return;
         }
-      } catch {
-        // Session auto-start failed silently
+
+        const id = sessionData?.id;
+        if (id && !cancelled && isAppActive) {
+          activateSession(id, deviceInfo);
+        } else if (id) {
+          void sessionService.end(id).catch(() => {});
+        }
+      } catch (error) {
+        const message =
+          (error as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message ?? "Cannot connect to the server yet.";
+        setAccessState({
+          status: "error",
+          message,
+          nextRetryAt: Date.now() + 10_000,
+        });
+        setMobileApiAccessEnabled(false);
+        scheduleQueueRetry(10);
+      } finally {
+        isStarting = false;
       }
     };
-    void autoStartSession();
+
+    const appStateSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        isAppActive = true;
+        clearBackgroundEnd();
+        void startSession();
+        return;
+      }
+
+      if (state === "background") {
+        isAppActive = false;
+        scheduleBackgroundEnd();
+      }
+    });
+
+    void startSession();
 
     return () => {
-      // End session on unmount
-      if (sessionId) {
-        sessionService.end(sessionId).catch(() => {});
-      }
+      cancelled = true;
+      appStateSubscription.remove();
+      clearBackgroundEnd();
+      clearQueueRetry();
+      clearHeartbeat();
     };
   }, []);
 
@@ -493,6 +673,76 @@ export default function HomeScreen() {
   const isCurrentPoiPlaying =
     activePoi?.id === detailPoi?.id &&
     (status === "playing" || status === "loading" || status === "paused");
+
+  if (accessState.status !== "ready") {
+    const retryInSeconds =
+      accessState.status === "queued" || accessState.status === "error"
+        ? Math.max(0, Math.ceil((accessState.nextRetryAt - currentTime) / 1000))
+        : null;
+    const isQueued = accessState.status === "queued";
+    const isError = accessState.status === "error";
+    const waitTitle = isQueued
+      ? "Đang chờ lượt truy cập"
+      : isError
+        ? "Đang kết nối lại"
+        : "Đang mở ứng dụng";
+    const waitSubtitle = isQueued
+      ? "Hệ thống hiện đã hết slot trực tuyến. Bạn sẽ được đưa vào ứng dụng ngay khi có slot trống."
+      : isError
+        ? accessState.message
+        : "Đang tạo phiên truy cập và kết nối máy chủ.";
+
+    return (
+      <SafeAreaView style={styles.waitContainer}>
+        <View style={styles.waitContent}>
+          <View style={styles.waitIconWrap}>
+            <ActivityIndicator size="large" color="#4f46e5" />
+          </View>
+
+          <Text style={styles.waitTitle}>{waitTitle}</Text>
+
+          <Text style={styles.waitSubtitle}>{waitSubtitle}</Text>
+
+          {isQueued && (
+            <View style={styles.waitStatsGrid}>
+              <View style={styles.waitStatCard}>
+                <Text style={styles.waitStatNumber}>
+                  #{accessState.position}
+                </Text>
+                <Text style={styles.waitStatLabel}>Vị trí chờ</Text>
+              </View>
+              <View style={styles.waitStatCard}>
+                <Text style={styles.waitStatNumber}>
+                  {accessState.queuedDevices}
+                </Text>
+                <Text style={styles.waitStatLabel}>Thiết bị đang chờ</Text>
+              </View>
+              <View style={styles.waitStatCard}>
+                <Text style={styles.waitStatNumber}>
+                  {accessState.concurrentUsers}/{accessState.maxConcurrentSessions}
+                </Text>
+                <Text style={styles.waitStatLabel}>Đang truy cập</Text>
+              </View>
+              <View style={styles.waitStatCard}>
+                <Text style={styles.waitStatNumber}>
+                  {accessState.availableSlots}
+                </Text>
+                <Text style={styles.waitStatLabel}>Slot trống</Text>
+              </View>
+            </View>
+          )}
+
+          {retryInSeconds !== null && (
+            <View style={styles.waitRetryBox}>
+              <Text style={styles.waitRetryText}>
+                Tự thử lại sau {retryInSeconds}s
+              </Text>
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -828,6 +1078,80 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc" },
+  waitContainer: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
+  },
+  waitContent: {
+    flex: 1,
+    padding: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  waitIconWrap: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    backgroundColor: "#eef2ff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  waitTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#111827",
+    textAlign: "center",
+  },
+  waitSubtitle: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#4b5563",
+    textAlign: "center",
+    maxWidth: 340,
+  },
+  waitStatsGrid: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 8,
+  },
+  waitStatCard: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    gap: 4,
+  },
+  waitStatNumber: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#4338ca",
+  },
+  waitStatLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    textAlign: "center",
+  },
+  waitRetryBox: {
+    backgroundColor: "#eef2ff",
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    marginTop: 4,
+  },
+  waitRetryText: {
+    color: "#4338ca",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   content: { flex: 1, padding: 14, gap: 10 },
   headerRow: {
     flexDirection: "row",

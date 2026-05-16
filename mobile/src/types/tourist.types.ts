@@ -69,7 +69,7 @@ export interface TourDetail {
 
 export interface TouristSession {
   id: string;
-  userId: string;
+  userId: string | null;
   tourId?: string | null;
   startedAt: string;
   endedAt?: string | null;

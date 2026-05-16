@@ -11,6 +11,7 @@ export interface SidebarMenuItem {
 
 export const adminMenuItems: SidebarMenuItem[] = [
   { key: 'admin-dashboard', label: 'Dashboard', path: ROUTES.admin.dashboard, iconKey: 'dashboard' },
+  { key: 'admin-monitoring', label: 'Monitoring', path: ROUTES.admin.monitoring, iconKey: 'dashboard' },
   {
     key: 'admin-management-group',
     label: 'Management',

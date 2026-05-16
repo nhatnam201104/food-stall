@@ -5,6 +5,6 @@ import { ttsLimiter } from "../middleware/rate-limit.middleware";
 
 const router = Router();
 
-router.post("/preview", authenticate, ttsLimiter, ttsController.preview);
+router.post("/preview", ttsLimiter, ttsController.preview);
 
 export default router;

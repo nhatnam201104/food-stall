@@ -1,5 +1,4 @@
 import {
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -26,7 +25,6 @@ import {
 import { styles } from "./settings-screen.styles";
 
 const SettingsScreen = () => {
-  const logout = useAuthStore((state: AuthStore) => state.logout);
   const user = useAuthStore((state: AuthStore) => state.user);
 
   // ── Language ───────────────────────────────────────────────────────────────
@@ -64,18 +62,6 @@ const SettingsScreen = () => {
         : tourStatus === "paused"
           ? "⏸ Paused"
           : "✓ Completed";
-
-  const handleLogout = async () => {
-    await logout();
-    router.replace("/auth/login");
-  };
-
-  const confirmLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Logout", style: "destructive", onPress: handleLogout },
-    ]);
-  };
 
   const handleProfilePress = () => {
     router.push("/profile");
@@ -120,11 +106,11 @@ const SettingsScreen = () => {
             )}
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.name}>{user?.fullName || "Tourist User"}</Text>
+            <Text style={styles.name}>{user?.fullName || "Guest Tourist"}</Text>
             <Text style={styles.email}>
-              {user?.email || "tourist@example.com"}
+              {user?.email || "Anonymous visitor session"}
             </Text>
-            <Text style={styles.role}>Role: Tourist</Text>
+            <Text style={styles.role}>Role: Visitor</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </Pressable>
@@ -227,9 +213,6 @@ const SettingsScreen = () => {
           </View>
         </View>
 
-        <Pressable onPress={confirmLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </Pressable>
       </ScrollView>
 
       {/* ── Language Picker Modal ──────────────────────────────────────────── */}

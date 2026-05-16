@@ -1,7 +1,9 @@
 import 'dotenv/config';
+import { createServer } from 'http';
 import { config } from './config';
 import createApp from './app';
 import { prisma } from './config/database';
+import { initSocketServer } from './config/socket';
 
 const startServer = async () => {
   try {
@@ -9,15 +11,17 @@ const startServer = async () => {
     console.log('✅ Database connected');
 
     const app = createApp();
+    const httpServer = createServer(app);
+    initSocketServer(httpServer);
 
-    const server = app.listen(config.port, config.host, () => {
+    const server = httpServer.listen(config.port, config.host, () => {
       console.log('\n========================================');
       console.log(`🚀  Server is running!`);
       console.log(`📦  Environment : ${config.env}`);
       console.log(`🧭  Host        : ${config.host}`);
       console.log(`🌐  Port        : ${config.port}`);
-      console.log(`🔗  API Base    : http://localhost:${config.port}/api/v1`);
-      console.log(`❤️  Health      : http://localhost:${config.port}/health`);
+      console.log(`🔗  API Base    : ${config.publicApiBaseUrl}/api/v1`);
+      console.log(`❤️  Health      : ${config.publicApiBaseUrl}/health`);
       console.log('========================================\n');
     });
 

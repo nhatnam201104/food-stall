@@ -11,7 +11,6 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import dayjs from 'dayjs';
 import { PageContainer, StatsCard } from '../../shared';
 import analyticsService from '../../../services/admin/analytics.service';
 import type { AdminOverview, TopPoi, SummaryAnalytics } from '../../../services/admin/analytics.service';
@@ -191,7 +190,7 @@ const AdminDashboard = () => {
 
       {/* Top POIs List */}
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={12}>
+        <Col xs={24}>
           <Card title="Top Performing POIs">
             <List
               dataSource={topPois.slice(0, 5)}
@@ -215,30 +214,6 @@ const AdminDashboard = () => {
           </Card>
         </Col>
 
-        {/* Recent Activities */}
-        <Col xs={24} lg={12}>
-          <Card title="Recent Activities">
-            <List
-              dataSource={overview?.recentActivities || []}
-              locale={{ emptyText: 'No recent activities' }}
-              renderItem={(item) => (
-                <List.Item>
-                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                    <Typography.Text>
-                      {item.poiName}
-                      <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
-                        via {item.triggerType.replace('_', ' ')}
-                      </Typography.Text>
-                    </Typography.Text>
-                    <Typography.Text type="secondary">
-                      {dayjs(item.triggeredAt).format('HH:mm')}
-                    </Typography.Text>
-                  </Space>
-                </List.Item>
-              )}
-            />
-          </Card>
-        </Col>
       </Row>
 
       {/* Summary Analytics */}

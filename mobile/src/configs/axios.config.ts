@@ -1,64 +1,25 @@
 import axios from 'axios';
-import Constants from 'expo-constants';
-import { NativeModules, Platform } from 'react-native';
-import { getAccessToken } from '../utils/auth-storage.util';
+import { getApiBaseUrl, getCandidateApiBaseUrls } from './api-url.config';
 
 type RetryableConfig = {
   _apiBaseRetryIndex?: number;
   baseURL?: string;
 };
 
-const DEFAULT_BASE_URL = 'http://localhost:3000/api/v1';
+const CANDIDATE_BASE_URLS = getCandidateApiBaseUrls();
+const BASE_URL = getApiBaseUrl();
+let isMobileApiAccessEnabled = false;
 
-const getHostFromScriptURL = (): string | null => {
-  const scriptURL = NativeModules?.SourceCode?.scriptURL as string | undefined;
-  if (!scriptURL) return null;
+const canRequestBeforeAccess = (url?: string): boolean => {
+  if (!url) return false;
 
-  try {
-    const parsed = new URL(scriptURL);
-    return parsed.hostname || null;
-  } catch {
-    return null;
-  }
+  return url.includes("/tourist/sessions/start")
+    || /\/tourist\/sessions\/[^/]+\/end/.test(url);
 };
 
-const getHostFromExpoConfig = (): string | null => {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (!hostUri) return null;
-
-  const [host] = hostUri.split(':');
-  return host || null;
+export const setMobileApiAccessEnabled = (enabled: boolean): void => {
+  isMobileApiAccessEnabled = enabled;
 };
-
-const buildBaseUrls = (): string[] => {
-  const urls: string[] = [];
-  const envBase = process.env.EXPO_PUBLIC_API_URL?.trim();
-
-  if (envBase) {
-    urls.push(envBase);
-  }
-
-  const scriptHost = getHostFromScriptURL();
-  if (scriptHost) {
-    urls.push(`http://${scriptHost}:3000/api/v1`);
-  }
-
-  const expoHost = getHostFromExpoConfig();
-  if (expoHost) {
-    urls.push(`http://${expoHost}:3000/api/v1`);
-  }
-
-  if (Platform.OS === 'android') {
-    urls.push('http://10.0.2.2:3000/api/v1');
-  }
-
-  urls.push(DEFAULT_BASE_URL);
-
-  return Array.from(new Set(urls));
-};
-
-const CANDIDATE_BASE_URLS = buildBaseUrls();
-const BASE_URL = CANDIDATE_BASE_URLS[0] || DEFAULT_BASE_URL;
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -66,11 +27,11 @@ const axiosInstance = axios.create({
   timeout: 20000,
 });
 
-axiosInstance.interceptors.request.use(async (config) => {
-  const token = await getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+axiosInstance.interceptors.request.use((config) => {
+  if (!isMobileApiAccessEnabled && !canRequestBeforeAccess(config.url)) {
+    return Promise.reject(new Error("Waiting for an available access slot."));
   }
+
   return config;
 });
 

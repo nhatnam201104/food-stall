@@ -14,7 +14,7 @@ import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authOtpService } from '../../../services/auth-otp.service';
-import { authStyles, COLORS } from '../login/auth.styles';
+import { authStyles, COLORS } from '../auth.styles';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -94,9 +94,9 @@ const ForgotPasswordForm = () => {
               <Text style={authStyles.buttonText}>{isLoading ? 'SENDING...' : 'SEND OTP'}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.replace('/auth/login')}>
+            <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
               <Text style={{ textAlign: 'center', color: COLORS.primary, fontWeight: '700' }}>
-                Back to Login
+                Back to app
               </Text>
             </TouchableOpacity>
           </View>

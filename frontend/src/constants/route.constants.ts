@@ -22,6 +22,7 @@ export const ROUTES = {
     tours: '/admin/tours',
     toursCreate: '/admin/tours/create',
     toursEdit: '/admin/tours/:id/edit',
+    monitoring: '/admin/monitoring',
     analytics: '/admin/analytics',
   },
   merchant: {

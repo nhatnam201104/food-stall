@@ -11,10 +11,34 @@ const requireEnv = (key: string): string => {
   return value;
 };
 
+const parseCsv = (value: string | undefined): string[] => {
+  if (!value) return [];
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+
+const port = parseInt(process.env.PORT || '3000', 10);
+const host = process.env.HOST || '0.0.0.0';
+const frontendUrl = trimTrailingSlash(process.env.FRONTEND_URL || 'http://localhost:5173');
+const publicApiBaseUrl = trimTrailingSlash(
+  process.env.PUBLIC_API_BASE_URL
+    || `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`,
+);
+const allowedOrigins = Array.from(new Set([
+  frontendUrl,
+  ...parseCsv(process.env.CORS_ORIGINS).map(trimTrailingSlash),
+]));
+
 export const config = {
   env: (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test',
-  port: parseInt(process.env.PORT || '3000', 10),
-  host: process.env.HOST || '0.0.0.0',
+  port,
+  host,
+  publicApiBaseUrl,
 
   database: {
     url: requireEnv('DATABASE_URL'),
@@ -43,7 +67,13 @@ export const config = {
   },
 
   frontend: {
-    url: process.env.FRONTEND_URL || 'http://localhost:5173',
+    url: frontendUrl,
+    allowedOrigins,
+  },
+
+  monitoring: {
+    maxConcurrentSessions: parseInt(process.env.MAX_CONCURRENT_SESSIONS || '500', 10),
+    warningThresholdPercent: parseInt(process.env.MONITORING_WARNING_THRESHOLD_PERCENT || '80', 10),
   },
 
   rateLimit: {

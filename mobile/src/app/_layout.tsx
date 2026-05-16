@@ -1,6 +1,6 @@
 import { useFonts } from "expo-font";
 import * as Location from "expo-location";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -8,31 +8,19 @@ import { Alert, Linking } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { STORAGE_KEYS } from "../constants/storage.constants";
-import { useAuthStore } from "../stores/auth.store";
-import type { AuthStore } from "../stores/auth.store";
 import { useLocationStore } from "../stores/locationStore";
 import { useLanguageStore } from "../stores/languageStore";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const router = useRouter();
-  const segments = useSegments();
-  const isAuthenticated = useAuthStore(
-    (state: AuthStore) => state.isAuthenticated,
-  );
-  const isHydrated = useAuthStore((state: AuthStore) => state.isHydrated);
-  const hydrateFromStorage = useAuthStore(
-    (state: AuthStore) => state.hydrateFromStorage,
-  );
   const [loaded] = useFonts({
     SpaceMono: require("../../assets/fonts/Space_Mono/SpaceMono-Regular.ttf"),
   });
 
   useEffect(() => {
-    hydrateFromStorage();
     useLanguageStore.getState().hydrate();
-  }, [hydrateFromStorage]);
+  }, []);
 
   useEffect(() => {
     if (loaded) {
@@ -41,22 +29,7 @@ export default function RootLayout() {
   }, [loaded]);
 
   useEffect(() => {
-    if (!isHydrated) return;
-
-    const inAuthGroup = segments[0] === "auth";
-
-    if (!isAuthenticated && !inAuthGroup) {
-      router.replace("/auth/login");
-      return;
-    }
-
-    if (isAuthenticated && inAuthGroup) {
-      router.replace("/(tabs)");
-    }
-  }, [isAuthenticated, isHydrated, router, segments]);
-
-  useEffect(() => {
-    if (!loaded || !isHydrated) return;
+    if (!loaded) return;
 
     let cancelled = false;
 
@@ -111,17 +84,15 @@ export default function RootLayout() {
     return () => {
       cancelled = true;
     };
-  }, [loaded, isHydrated]);
+  }, [loaded]);
 
-  if (!loaded || !isHydrated) {
+  if (!loaded) {
     return null;
   }
 
   return (
     <SafeAreaProvider>
       <Stack>
-        {/* auth là nhóm trang đăng nhập, đăng ký */}
-        <Stack.Screen name="auth" options={{ headerShown: false }} />
         {/* (tabs) là nhóm trang có thanh menu dưới cùng */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* Tour detail — push over tabs */}

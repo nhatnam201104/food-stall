@@ -9,6 +9,29 @@ import { globalLimiter } from './middleware/rate-limit.middleware';
 import { errorMiddleware } from './middleware/error.middleware';
 import apiRoutes from './routes/index';
 
+const TRUSTED_ORIGIN_SUFFIXES = [
+  '.expo.dev',
+  '.exp.direct',
+  '.devtunnels.ms',
+  '.ngrok.io',
+  '.ngrok-free.app',
+  '.trycloudflare.com',
+];
+
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin || config.env !== 'production') return true;
+  if (config.frontend.allowedOrigins.includes(origin.replace(/\/+$/, ''))) return true;
+
+  try {
+    const { hostname } = new URL(origin);
+    return TRUSTED_ORIGIN_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
+      || hostname === 'localhost'
+      || hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+};
+
 const createApp = () => {
   const app = express();
 
@@ -17,7 +40,9 @@ const createApp = () => {
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   }));
   app.use(cors({
-    origin: config.frontend.url,
+    origin: (origin, callback) => {
+      callback(null, isAllowedOrigin(origin));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

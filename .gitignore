@@ -375,3 +375,4 @@ buck-out/
 /markdown
 specs/
 .claude/
+docs/
